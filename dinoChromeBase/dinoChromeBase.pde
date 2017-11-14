@@ -42,8 +42,13 @@ boolean showCommandBar;
 boolean showTrajectories;
 /// La taille du hud, une échelle réglable
 float hudSize, hudSizeStep;
+
 /// Pour passer les paliers sans problèmes
 int immortal;/// 3 etats: -1 (non découvert), 0(off), 1(on)
+
+/// Il sert à se déplacer comme dans un menu
+int debugIndex;
+
 
 /// TODO: Show a menu in order to modify the gravity
 /// TODO: Slow down the game before entering in the menu
@@ -162,6 +167,7 @@ void setup() {
 
   // Non découvert
   immortal = -1;
+  debugIndex = -1;
 
 
   // Cette variable sera valable pour toute la sesssion (au moin)
@@ -426,13 +432,16 @@ void afficheDebugMenu() {
     // Pour calculer l'abscicce du texte
     int index = 0;
 
-    text("HUD Size: " + hudSize, 0, index * TEXT_SIZE / 2);
+    text("HUD Size: " + hudSize + (debugIndex == index ? " <" : ""), 0, index * TEXT_SIZE / 2);
     index++;
 
     if (immortal > -1) {
-      text("Immortal: " + (immortal == 0? "OFF": " ON"), 0, index * TEXT_SIZE / 2);
+      text("Immortal: " + (immortal == 0? "OFF": " ON") + (debugIndex == index ? " <" : ""), 0, index * TEXT_SIZE / 2);
       index++;
     }
+    
+    
+    
   }
 }
 
@@ -484,17 +493,22 @@ void keyPressed() {
       ////SOUNDERRORsonSaut.play();
       dY = dY0;
     }
-  } else if (key == ENTER) {
-    if (cache.equals("immortal")) {
-      immortal = (immortal < 1) ? 1 : 0;
-    }
   } else if (key == '²') {
     showCommandBar = !showCommandBar; /// TODO: notifications de changements de variables
     /// TODO: Changement de profiles
-  } else if (key == DELETE) {
-    cache = "";
   } else if (!showCommandBar) {
     // Ne rien faire, juste empêcher les instructions plus bas si le menu est caché
+  } else if (key == DELETE) {
+    cache = "";
+  } else if (key == ENTER) {
+    if (cache.equals("immortal")) {
+      immortal = (immortal < 1) ? 1 : 0;
+    } else if (cache.equals("menu")) {
+      // 0 -> -1 -> 0 -> ...
+      // 1 -> -2 -> 1 -> ...
+      // 2 -> -3 -> 2 -> ...
+      debugIndex = -1 - debugIndex;
+    }
   } else if (key == BACKSPACE) {
     /// Retire le dernier caractère de la chaine de caractere (si elle est vide, ne copie pas -1 caracteres)
     cache = cache.substring(0, max((cache.length() - 1), 0));
@@ -510,6 +524,8 @@ void keyPressed() {
         hudSize = hudSizeStep;
       }
     }
+  } else if ((key > '0') && (key < '9')) {/// 2 4 6 8
+    debugIndex += ((key == '8' && debugIndex > 0) ? -1 : ((key == '2') ? 1 : 0));
   }// TODO pause the game
   println("Cache11", cache, key);
 }
