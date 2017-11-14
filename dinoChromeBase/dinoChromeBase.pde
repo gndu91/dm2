@@ -423,14 +423,15 @@ void afficheDebugMenu() {
     fill(TEXT_COLOR * hudSize, 127);
     textAlign(LEFT, TOP);
     textSize(TEXT_SIZE / 2);
-    float y = 0;
+    // Pour calculer l'abscicce du texte
+    int index = 0;
 
-    text("HUD Size: " + hudSize, 0, y);
-    y += TEXT_SIZE / 2;
+    text("HUD Size: " + hudSize, 0, index * TEXT_SIZE / 2);
+    index++;
 
     if (immortal > -1) {
-      text("Immortal: " + (immortal == 0? "OFF": " ON"), 0, y);
-      y += TEXT_SIZE / 2;
+      text("Immortal: " + (immortal == 0? "OFF": " ON"), 0, index * TEXT_SIZE / 2);
+      index++;
     }
   }
 }
