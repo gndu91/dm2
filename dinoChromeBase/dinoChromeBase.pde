@@ -42,6 +42,8 @@ boolean showCommandBar;
 boolean showTrajectories;
 /// La taille du hud, une échelle réglable
 float hudSize, hudSizeStep;
+/// Pour passer les paliers sans problèmes
+int immortal;/// 3 etats: -1 (non découvert), 0(off), 1(on)
 
 /// TODO: Show a menu in order to modify the gravity
 /// TODO: Slow down the game before entering in the menu
@@ -157,6 +159,9 @@ void setup() {
 
   showCommandBar = false;
   showTrajectories = false;
+
+  // Non découvert
+  immortal = -1;
 
 
   // Cette variable sera valable pour toute la sesssion (au moin)
@@ -281,12 +286,15 @@ void calculeScore() {
 //
 ////////////////////////////////////////////////////////////////////////////////////////
 void testeCollisions() {
-  for (int[] cac : cactuses) {
-    if (cac[POSITION]>0) {
-      int x = cac[POSITION], y = baseY, w = cactusImgs[cac[TYPE]].width, h = cactusImgs[cac[TYPE]].height;
-      if ((abs(x - DINO_X) < (w/ 2)) && (abs(y - baseY + positionDino) < (h / 2))) {
-        ////SOUNDERRORsonMort.play();
-        gameOver = true;
+  /// Si le mode n'a pa été découvert ou qu'il est désactivé
+  if (immortal < 1) {
+    for (int[] cac : cactuses) {
+      if (cac[POSITION]>0) {
+        int x = cac[POSITION], y = baseY, w = cactusImgs[cac[TYPE]].width, h = cactusImgs[cac[TYPE]].height;
+        if ((abs(x - DINO_X) < (w/ 2)) && (abs(y - baseY + positionDino) < (h / 2))) {
+          ////SOUNDERRORsonMort.play();
+          gameOver = true;
+        }
       }
     }
   }
@@ -411,12 +419,20 @@ void afficheScore() {
 //
 ////////////////////////////////////////////////////////////////////////////////////////
 void afficheDebugMenu() {
-  fill(TEXT_COLOR * hudSize, 127);
-  textAlign(LEFT, TOP);
-  textSize(TEXT_SIZE / 2);
-  float y = 0;
-  text("HUD Size: " + hudSize, 0, y);
-  y += TEXT_SIZE / 2;
+  if (showCommandBar) {
+    fill(TEXT_COLOR * hudSize, 127);
+    textAlign(LEFT, TOP);
+    textSize(TEXT_SIZE / 2);
+    float y = 0;
+
+    text("HUD Size: " + hudSize, 0, y);
+    y += TEXT_SIZE / 2;
+
+    if (immortal > -1) {
+      text("Immortal: " + (immortal == 0? "OFF": " ON"), 0, y);
+      y += TEXT_SIZE / 2;
+    }
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -467,6 +483,10 @@ void keyPressed() {
       ////SOUNDERRORsonSaut.play();
       dY = dY0;
     }
+  } else if (key == ENTER) {
+    if (cache.equals("immortal")) {
+      immortal = (immortal < 1) ? 1 : 0;
+    }
   } else if (key == '²') {
     showCommandBar = !showCommandBar; /// TODO: notifications de changements de variables
     /// TODO: Changement de profiles
@@ -484,11 +504,7 @@ void keyPressed() {
     cache += char(key & ~32);
   } else if ((key == '+') || (key == '-')) {
     if (cache.equals("gui")) {
-      if (key=='+') {
-        hudSize += hudSizeStep;
-      } else {
-        hudSize -= hudSizeStep;
-      } 
+      hudSize += (key=='+' ? 1 : -1) * hudSizeStep;
       if (hudSize < hudSizeStep) {
         hudSize = hudSizeStep;
       }
