@@ -1,34 +1,52 @@
 //
 // importation de la librairie son
 //
-import processing.sound.*;
+//SOUNDBUGimport processing.sound.*;
 
 ////////////////////////////////////////////////////////////////////////////////////////
 //
 // les variables associées aux ressources
 //
 ////////////////////////////////////////////////////////////////////////////////////////
-// les images
-PImage solImg;
+// Les images:
+/// - solImg servira à l'affichage du sol, elle sera répétée pour pouvoir prendre tout l'écran
+/// - dinoImgs est une liste d'images, les deux premieres cases seront pour la marche et les deux
+///    dernieres serviront au saut, pour éviter de me tromper entre la 2 et la 3, je vais
+///    utiliser les constantes JMP_PIC et DEATH_PIC pour me référer à ces dernières
+/// - cactusImgs est une liste de deux images, et comme pour dinoImgs, j'utiliserai les 
+///    constantes SIMPLE et TRIPLE pour eviter de me tromper
+PImage solImg, dinoImgs[], cactusImgs[];
 
 // les sons
-SoundFile sonCent; 
+/// De même, j'utilise un tableau pour faire référence aux sons, avec les constantes:
+///  JUMP_SOUND, DEATH_SOUND, TODO: add more
+//SOUNDBUGSoundFile sons[]; 
+
 
 // la police de caractères
 PFont myFont;
+
+// Les constantes associées aux indices
+/// Les constantes associées au dinosaure (les deux premieres cases n'ont pas besoin de noms
+final int JMP_PIC = 2, DEATH_PIC = 3;
+/// Les constantes associées aux cactuses (à leurs images)
+final int SIMPLE = 0, TRIPLE = 1;
+/// Les indices des sons
+final int JUMP_SOUND = 0, DEATH_SOUND = 1;
 
 ////////////////////////////////////////////////////////////////////////////////////////
 //
 // les variables associées aux sprites
 //
 ////////////////////////////////////////////////////////////////////////////////////////
-// le niveau du sol
-int baseY;
-// la vitesse de défilement horizontale
-float vitesseX;
+// le niveau du sol, le zoom, la vitesse
+PVector referentiel, echelle, vitesse;
 
-// les coordonnées du sol
-float sol1x, sol2x, sol3x;
+
+/// L'unique ordonnée du sol: à parir de celle-ci, on pourra trouver les autres, cela
+///   peut rendre possible l'élargissement de l'écran (nous ne sommes plus limité à trois
+///   "instances" du sol)
+float solX;
 
 ////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -38,6 +56,12 @@ float sol1x, sol2x, sol3x;
 // est-ce que c'est fini ?
 boolean gameOver;
 
+// 50 milisecondes
+float dT = 50 * 0.001;
+
+/// Les variables de débogage
+boolean dSpeedFollowsMouse;
+
 ////////////////////////////////////////////////////////////////////////////////////////
 //
 // Initialisation générale
@@ -46,6 +70,9 @@ boolean gameOver;
 void setup() {
   // choisit la taille de la fenêtre
   size(1200, 500);
+
+  // On modifie le frameRate pour respecter dT initial => vitesses réelles
+  frameRate(1 / dT);/// XXX Maybe it's 1/dT
 
   // crée la fonte
   myFont = createFont("joystix.ttf", 32);
@@ -58,7 +85,10 @@ void setup() {
   solImg = loadImage("sol.png");
 
   // charge les sons
-  sonCent = new SoundFile(this, "cent.mp3");
+  //SOUNDBUGsonCent = new SoundFile(this, "cent.mp3");
+
+  /// Les variables de débogage
+  dSpeedFollowsMouse = false;
 
   initJeu();
   gameOver = true;
@@ -71,14 +101,15 @@ void setup() {
 ////////////////////////////////////////////////////////////////////////////////////////
 void initJeu() {
   // la hauteur du sol
-  baseY = height * 3 / 4;
-  // la vitesse de défilement
-  vitesseX = 8;
+  referentiel = new PVector(50, (height * 3 / 4));
+  echelle = new PVector(2, -1);
+  
+  // La vitesse de défilement sera rattaché au perso
+  vitesse = new PVector(40, 0);// Il va vers la droite
+  
 
   // initialise le sol
-  sol1x = 300;
-  sol2x = 900;
-  sol3x = 1500;
+  solX = 0;
   
   // initialisations générales
   gameOver = false;
@@ -91,6 +122,8 @@ void initJeu() {
 ////////////////////////////////////////////////////////////////////////////////////////
 void draw() {
   background(255);
+  
+  debugTools();
 
   // met à jour l'affichage
   afficheScore();
@@ -129,22 +162,27 @@ void testeCollisions() {
 
 ////////////////////////////////////////////////////////////////////////////////////////
 //
+// Outils de débogages
+//
+////////////////////////////////////////////////////////////////////////////////////////
+void debugTools() {
+  if(dSpeedFollowsMouse) {
+    vitesse.x = mouseY;
+  }
+}
+////////////////////////////////////////////////////////////////////////////////////////
+//
 // calcule le mouvement du sol
 //
 ////////////////////////////////////////////////////////////////////////////////////////
 void mouvementSol() {
-  // fait défiler le sol
-  sol1x -= vitesseX;
-  sol2x -= vitesseX;
-  sol3x -= vitesseX;
-
-  // le sol réapparaît à droite quand il a disparu à gauche
-  if (sol1x < -300)
-    sol1x += 1800;
-  if (sol2x < -300)
-    sol2x += 1800;
-  if (sol3x < -300)
-    sol3x += 1800;
+  ///  Faire défiler le sol, en tenant en compte du fait que la vitesse est une vitesse
+  ///    instantanée, et que par conséquent le déplacement se fera en tenant en compte 
+  ///    le temps écoulé depuis le dernier affichage: v -> dx/dt => dx ~= v*dt
+  ///  De plus, cette variable ne sera qu'un décalage sur [0, 600], car au moment
+  ///    d'afficher le sol, elle servira à décider où afficher la première, et les
+  ///    autres ne feront que suivre.
+  solX = ((solX - (vitesse.x * dT)) % 600);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -177,10 +215,12 @@ void afficheScore() {
 //
 ////////////////////////////////////////////////////////////////////////////////////////
 void afficheSprites() {
-  // affiche le sol
-  image(solImg, sol1x, baseY + 25);
-  image(solImg, sol2x, baseY + 25);
-  image(solImg, sol3x, baseY + 25);
+  // Affiche le sol, TODO: Add a constant for the 600
+  for(float x = solX * echelle.x % 600; x < width + 600; x += 600) {
+    image(solImg, x, referentiel.y + 25);
+    ellipse(x, height / 2, 10, 10);
+  }
+  
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -193,5 +233,10 @@ void keyPressed() {
   if ((key == ' ') && gameOver) {
     println("ici");
     initJeu();
+  } else {/// Cheat codes
+    if(char(key & ~32) == 'M') {/// TODO: Afficher ceci
+      println("Mouse");
+      dSpeedFollowsMouse = !dSpeedFollowsMouse;
+    }
   }
 }
