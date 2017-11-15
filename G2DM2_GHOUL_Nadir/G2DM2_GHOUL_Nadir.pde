@@ -167,7 +167,7 @@ void testeCollisions() {
 ////////////////////////////////////////////////////////////////////////////////////////
 void debugTools() {
   if(dSpeedFollowsMouse) {
-    vitesse.x = mouseY;
+    vitesse.x = mouseX;
   }
 }
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -234,8 +234,10 @@ void keyPressed() {
     println("ici");
     initJeu();
   } else {/// Cheat codes
-    if(char(key & ~32) == 'M') {/// TODO: Afficher ceci
-      println("Mouse");
+    /// Spécificitées de l'ASCII: les minuscules sont à 32 près des majuscules
+    ///  Le ou unaire '|' permet de convertir majuscule->minuscule et minuscule->minuscule
+    ///  comme vu en amphi et en TD
+    if(char(key | 32) == 'm') {/// TODO: Afficher ceci
       dSpeedFollowsMouse = !dSpeedFollowsMouse;
     }
   }
