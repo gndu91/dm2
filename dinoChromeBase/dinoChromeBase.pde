@@ -20,7 +20,7 @@ final int NB_CAC_INIT = 10;
 float NB_CAC;
 int current_cac = 0;
 /// TODO: Auguementer la taille
-int[][] cactuses;
+float[][] cactuses;
 // Type de cactus
 final int SIMPLE = 0, 
   TRIPLE = 1;
@@ -39,16 +39,20 @@ PFont myFont;
 // Debug options
 String cache;
 boolean showCommandBar;
+boolean showHUD;
 boolean showTrajectories;
 /// La taille du hud, une échelle réglable
 float hudSize, hudSizeStep;
 
 /// Pour passer les paliers sans problèmes
-int immortal;/// 3 etats: -1 (non découvert), 0(off), 1(on)
+boolean immortal;
 
 /// Il sert à se déplacer comme dans un menu
 int debugIndex;
 
+
+////////////////////////////////////////////////////////////////////////////////////////
+//
 
 /// TODO: Show a menu in order to modify the gravity
 /// TODO: Slow down the game before entering in the menu
@@ -65,8 +69,9 @@ int debugIndex;
 // le niveau du sol
 int baseY;
 // la vitesse de défilement horizontale
-final float dX = 10;
+float dX = 10;
 // Ce n'est pas une vitesse car dt est grand
+float dT = 0.5;
 
 // la vitesse verticale du dinosaure
 float dY;
@@ -163,10 +168,11 @@ void setup() {
   hudSizeStep = 0.1;
 
   showCommandBar = false;
+  showHUD = false;
   showTrajectories = false;
 
   // Non découvert
-  immortal = -1;
+  immortal = false;
   debugIndex = -1;
 
 
@@ -207,8 +213,8 @@ void initJeu() {
 
   NB_CAC = NB_CAC_INIT;
   current_cac = 0;
-  cactuses = new int[2][NB_CAC_INIT];
-  for (int[] cac : cactuses) {
+  cactuses = new float[NB_CAC_INIT][2];
+  for (float[] cac : cactuses) {
     cac[POSITION] = cac[TYPE] = -1;
   }
 }
@@ -251,12 +257,6 @@ void draw() {
   if (showTrajectories) {
     /// TODO: This
   }
-  if (showCommandBar) {
-    textAlign(LEFT, BOTTOM);
-    textSize(TEXT_SIZE);
-    fill(TEXT_COLOR);
-    text("command:" + cache, 0, height);
-  }
 
 
   // println("Détente", detente, frameRate, "position", positionDino);
@@ -271,9 +271,7 @@ void draw() {
 ////////////////////////////////////////////////////////////////////////////////////////
 void calculeScore() {
   if (scoringMethod == METHOD_0) {
-    score += scoringWeight;// vitesseX
-  } else if (scoringMethod == METHOD_1) {
-    score += dX * scoringWeight;
+    score += dT;
   }
 
   // Cette manière de voir les paliers s'était imposée d'elle-même car le jeu parfois
@@ -293,10 +291,11 @@ void calculeScore() {
 ////////////////////////////////////////////////////////////////////////////////////////
 void testeCollisions() {
   /// Si le mode n'a pa été découvert ou qu'il est désactivé
-  if (immortal < 1) {
-    for (int[] cac : cactuses) {
+  if (!immortal) {
+    for (float[] cac : cactuses) {
+      // TODO: Show hitboxes
       if (cac[POSITION]>0) {
-        int x = cac[POSITION], y = baseY, w = cactusImgs[cac[TYPE]].width, h = cactusImgs[cac[TYPE]].height;
+        float x = cac[POSITION], y = baseY, w = cactusImgs[(int)cac[TYPE]].width, h = cactusImgs[(int)cac[TYPE]].height;
         if ((abs(x - DINO_X) < (w/ 2)) && (abs(y - baseY + positionDino) < (h / 2))) {
           ////SOUNDERRORsonMort.play();
           gameOver = true;
@@ -313,9 +312,9 @@ void testeCollisions() {
 ////////////////////////////////////////////////////////////////////////////////////////
 void mouvementSol() {
   // fait défiler le sol
-  sol1x -= dX;
-  sol2x -= dX;
-  sol3x -= dX;
+  sol1x -= dX / dT;
+  sol2x -= dX / dT;
+  sol3x -= dX / dT;
 
   // le sol réapparaît à droite quand il a disparu à gauche
   if (sol1x < -300)
@@ -332,9 +331,9 @@ void mouvementSol() {
 //
 ////////////////////////////////////////////////////////////////////////////////////////
 void mouvementCactus() {
-  for (int[] cac : cactuses) {
+  for (float[] cac : cactuses) {
     if (cac[POSITION] > -1)
-      cac[POSITION] -= dX;
+      cac[POSITION] -= dX / dT;
   }
   if (cactuses[current_cac][POSITION] < 0) {
     cactuses[current_cac][TYPE] = random(0, 100) < 50 ? SIMPLE : TRIPLE;
@@ -425,23 +424,45 @@ void afficheScore() {
 //
 ////////////////////////////////////////////////////////////////////////////////////////
 void afficheDebugMenu() {
-  if (showCommandBar) {
+  if (showHUD) {
     fill(TEXT_COLOR * hudSize, 127);
     textAlign(LEFT, TOP);
     textSize(TEXT_SIZE / 2);
     // Pour calculer l'abscicce du texte
     int index = 0;
 
+
+    /// TODO: Alignement du texte
     text("HUD Size: " + hudSize + (debugIndex == index ? " <" : ""), 0, index * TEXT_SIZE / 2);
     index++;
 
-    if (immortal > -1) {
-      text("Immortal: " + (immortal == 0? "OFF": " ON") + (debugIndex == index ? " <" : ""), 0, index * TEXT_SIZE / 2);
+    text("Immortal: " + (immortal? " ON": "OFF") + (debugIndex == index ? " <" : ""), 0, index * TEXT_SIZE / 2);
+    index++;
+    
+    text("Gravity: " + g + (debugIndex == index ? " <" : ""), 0, index * TEXT_SIZE / 2);
+    index++;
+    
+    text("Speed: " + (dX / dT) + (debugIndex == index ? " <" : ""), 0, index * TEXT_SIZE / 2);
+    index++;
+
+    int x = 15 * TEXT_SIZE / 2;
+    index = 0;
+    for (float[] cac : cactuses) {
+      String string = "Cactus ";
+      for (int i = 0; i < 2 - str(index).length(); ++i)string += "0";
+      string += index + " " + (cac[TYPE] == SIMPLE ? "SIMPLE" : cac[TYPE] == TRIPLE ? "TRIPLE" : "??????");
+      string += " " + int(cac[X]);
+      text(string, x, index * TEXT_SIZE / 2);
       index++;
     }
-    
-    
-    
+    text(cactuses.length + " cactuses", x, index * TEXT_SIZE / 2);
+  }
+
+  if (showCommandBar) {
+    textAlign(LEFT, BOTTOM);
+    textSize(TEXT_SIZE);
+    fill(TEXT_COLOR);
+    text("command:" + cache, 0, height);
   }
 }
 
@@ -469,9 +490,9 @@ void afficheSprites() {
   // affiche les cactus: Chaque cactus est représenté sur une sorte de ruban
   // le ruban défini leurs positions, si elle est positive, on les dessine
   // sinon, on ne les prends pas en compte
-  for (int[] cac : cactuses) {
+  for (float[] cac : cactuses) {
     if (cac[POSITION] > 0) {
-      image(cactusImgs[cac[TYPE]], cac[POSITION], baseY);
+      image(cactusImgs[(int)cac[TYPE]], cac[POSITION], baseY);
     }
   }
 }
@@ -494,15 +515,24 @@ void keyPressed() {
       dY = dY0;
     }
   } else if (key == '²') {
-    showCommandBar = !showCommandBar; /// TODO: notifications de changements de variables
+    showHUD = !showHUD; /// TODO: notifications de changements de variables
     /// TODO: Changement de profiles
-  } else if (!showCommandBar) {
-    // Ne rien faire, juste empêcher les instructions plus bas si le menu est caché
+  } else if (!showHUD) {
+    /// Si le HUD n'est pas affiché, ne rien faire => évite d'inbriquer un "if(showHUD)"
+  } else if (!showCommandBar && (char(key & ~32) == 'p')) {
+    // Les touches du clavier ont une utilité
+    append(cactuses, new float[2]);
+    cactuses[cactuses.length - 1][TYPE] = -1;
+    cactuses[cactuses.length - 1][X] = -1;
+  } else if (key == TAB) {
+    showCommandBar = !showCommandBar;
+  } else if (key == DELETE) {
+    cache = "";
   } else if (key == DELETE) {
     cache = "";
   } else if (key == ENTER) {
-    if (cache.equals("immortal")) {
-      immortal = (immortal < 1) ? 1 : 0;
+    if (cache.equals("immortal") || cache.equals("i")) {
+      immortal = !immortal;
     } else if (cache.equals("menu")) {
       // 0 -> -1 -> 0 -> ...
       // 1 -> -2 -> 1 -> ...
