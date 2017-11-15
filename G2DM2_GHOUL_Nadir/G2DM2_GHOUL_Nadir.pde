@@ -12,7 +12,7 @@
 /// - solImg servira à l'affichage du sol, elle sera répétée pour pouvoir prendre tout l'écran
 /// - dinoImgs est une liste d'images, les deux premieres cases seront pour la marche et les deux
 ///    dernieres serviront au saut, pour éviter de me tromper entre la 2 et la 3, je vais
-///    utiliser les constantes JMP_PIC et DEATH_PIC pour me référer à ces dernières
+///    utiliser les constantes JUMP_PIC et DEATH_PIC pour me référer à ces dernières
 /// - cactusImgs est une liste de deux images, et comme pour dinoImgs, j'utiliserai les 
 ///    constantes SIMPLE et TRIPLE pour eviter de me tromper
 PImage solImg, dinoImgs[], cactusImgs[];
@@ -28,7 +28,7 @@ PFont myFont;
 
 // Les constantes associées aux indices
 /// Les constantes associées au dinosaure (les deux premieres cases n'ont pas besoin de noms
-final int JMP_PIC = 2, DEATH_PIC = 3;
+final int JUMP_PIC = 2, DEATH_PIC = 3;
 /// Les constantes associées aux cactuses (à leurs images)
 final int SIMPLE = 0, TRIPLE = 1;
 /// Les indices des sons
@@ -83,6 +83,12 @@ void setup() {
   // charge les images
   imageMode(CENTER);
   solImg = loadImage("sol.png");
+
+  dinoImgs = new PImage[4];
+  dinoImgs[0] = loadImage("dinoMarche1.png");
+  dinoImgs[1] = loadImage("dinoMarche2.png");
+  dinoImgs[JUMP_PIC] = loadImage("dinoSaut.png");
+  dinoImgs[DEATH_PIC] = loadImage("dinoMort.png");
 
   // charge les sons
   //SOUNDBUGsonCent = new SoundFile(this, "cent.mp3");
