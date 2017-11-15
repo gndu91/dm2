@@ -40,7 +40,13 @@ final int JUMP_SOUND = 0, DEATH_SOUND = 1;
 //
 ////////////////////////////////////////////////////////////////////////////////////////
 // le niveau du sol, le zoom, la vitesse
-PVector referentiel, echelle, vitesse;
+PVector referentiel, echelle, vitesse, position;
+
+/// La vitesse initiale du saut et la force de pesanteur
+//final float g0 = 9.81, vitesseSaut0 = 98.1;
+final float g0 = 5, vitesseSaut0 = 50;
+
+float jumpSpeed, g;
 
 
 /// L'unique ordonnée du sol: à parir de celle-ci, on pourra trouver les autres, cela
@@ -61,6 +67,10 @@ float dT = 50 * 0.001;
 
 /// Les variables de débogage
 boolean dSpeedFollowsMouse;
+boolean dGravityFollowsMouse;
+
+///Le texte
+final int TEXT_SIZE = 32;
 
 ////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -75,13 +85,12 @@ void setup() {
   frameRate(1 / dT);/// XXX Maybe it's 1/dT
 
   // crée la fonte
-  myFont = createFont("joystix.ttf", 32);
+  myFont = createFont("joystix.ttf", TEXT_SIZE);
   textFont(myFont);
   textAlign(CENTER, CENTER);
   fill(64);
 
   // charge les images
-  imageMode(CENTER);
   solImg = loadImage("sol.png");
 
   dinoImgs = new PImage[4];
@@ -95,6 +104,11 @@ void setup() {
 
   /// Les variables de débogage
   dSpeedFollowsMouse = false;
+  dGravityFollowsMouse = false;
+
+  /// La vitesse initiale de saut: 
+  jumpSpeed = vitesseSaut0;
+  g = g0;
 
   initJeu();
   gameOver = true;
@@ -109,14 +123,15 @@ void initJeu() {
   // la hauteur du sol
   referentiel = new PVector(50, (height * 3 / 4));
   echelle = new PVector(2, -1);
-  
+
   // La vitesse de défilement sera rattaché au perso
   vitesse = new PVector(40, 0);// Il va vers la droite
-  
+  position = new PVector(0, 0);// Il définit l'origine
+
 
   // initialise le sol
   solX = 0;
-  
+
   // initialisations générales
   gameOver = false;
 }
@@ -128,7 +143,7 @@ void initJeu() {
 ////////////////////////////////////////////////////////////////////////////////////////
 void draw() {
   background(255);
-  
+
   debugTools();
 
   // met à jour l'affichage
@@ -145,7 +160,7 @@ void draw() {
   }
   // sinon
   else {
-    textAlign(CENTER);
+    textAlign(CENTER);textSize(TEXT_SIZE);
     text("G A M E  O V E R", width/2, height/2);
   }
 }
@@ -172,9 +187,17 @@ void testeCollisions() {
 //
 ////////////////////////////////////////////////////////////////////////////////////////
 void debugTools() {
-  if(dSpeedFollowsMouse) {
+  if (dSpeedFollowsMouse) {
     vitesse.x = mouseX;
+  } else if (dGravityFollowsMouse) {
+    jumpSpeed = 100 * vitesseSaut0 / mouseX;
+    g = 100 * g0 / mouseY;
+    /// TODO: Create a global 32
   }
+  textAlign(TOP, LEFT);textSize(TEXT_SIZE / 3);
+  text("Vitesse de saut               " + jumpSpeed, 0, TEXT_SIZE / 3);
+  text("Acceleration gravitationnelle " + g,         0, TEXT_SIZE * 2 / 3);
+  text("Vitessed de défilement        " + vitesse.x, 0, TEXT_SIZE);
 }
 ////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -188,7 +211,7 @@ void mouvementSol() {
   ///  De plus, cette variable ne sera qu'un décalage sur [0, 600], car au moment
   ///    d'afficher le sol, elle servira à décider où afficher la première, et les
   ///    autres ne feront que suivre.
-  solX = ((solX - (vitesse.x * dT)) % 600);
+  solX -= (vitesse.x * dT);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -205,6 +228,13 @@ void mouvementCactus() {
 //
 ////////////////////////////////////////////////////////////////////////////////////////
 void mouvementDino() {
+  position.y += vitesse.y;
+  if (position.y < 0) {
+    position.y = 0;
+    vitesse.y = 0;
+  } else if (position.y > 0) {
+    vitesse.y -= g;
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -222,11 +252,19 @@ void afficheScore() {
 ////////////////////////////////////////////////////////////////////////////////////////
 void afficheSprites() {
   // Affiche le sol, TODO: Add a constant for the 600
-  for(float x = solX * echelle.x % 600; x < width + 600; x += 600) {
-    image(solImg, x, referentiel.y + 25);
-    ellipse(x, height / 2, 10, 10);
+  /// Je suis suceptible d'accidentellement changer cette variable autre part
+  imageMode(CENTER);
+  /// La position de la premiere dépend de l'echelle, mais les autres ne seront que
+  ///  des répétitions, avec un decalage fixe
+  for (float x = solX * echelle.x % 600; x < width + 600; x += 600) {
+    image(solImg, x + referentiel.x, referentiel.y + 25);
+    /// DEBUG
+    ellipse(x, referentiel.y + 25, 10, 10);
   }
-  
+
+  // Affiche le dino TODO: Faire mieux
+  image(dinoImgs[position.y < 10 ? (int) (frameCount * vitesse.x / 1000) % 2 : gameOver ? DEATH_PIC : JUMP_PIC], 
+    (position.x * echelle.x) + referentiel.x, (position.y * echelle.y) + referentiel.y);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -239,12 +277,37 @@ void keyPressed() {
   if ((key == ' ') && gameOver) {
     println("ici");
     initJeu();
+  } else if (key == CODED && keyCode == UP) {
+    if (position.y < 10) {
+      vitesse.y = jumpSpeed;
+    }
   } else {/// Cheat codes
     /// Spécificitées de l'ASCII: les minuscules sont à 32 près des majuscules
     ///  Le ou unaire '|' permet de convertir majuscule->minuscule et minuscule->minuscule
     ///  comme vu en amphi et en TD
-    if(char(key | 32) == 'm') {/// TODO: Afficher ceci
+
+    switch(key | 32) {/// TODO: Afficher ceci
+    case 'm':
       dSpeedFollowsMouse = !dSpeedFollowsMouse;
+      break;
+    case 'g':
+      dGravityFollowsMouse = !dGravityFollowsMouse;
+      break;
     }
   }
+}
+
+void mouseDragged() {
+  dSpeedFollowsMouse = mouseButton == LEFT;
+  dGravityFollowsMouse = mouseButton == RIGHT;
+}
+
+void mousePressed() {
+  dSpeedFollowsMouse = mouseButton == LEFT;
+  dGravityFollowsMouse = mouseButton == RIGHT;
+}
+
+void mouseReleased() {
+  dSpeedFollowsMouse = false;
+  dGravityFollowsMouse = false;
 }
