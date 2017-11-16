@@ -72,6 +72,9 @@ boolean dGravityFollowsMouse;
 ///Le texte
 final int TEXT_SIZE = 32;
 
+/// Le score
+float score, highScore, palier;
+
 ////////////////////////////////////////////////////////////////////////////////////////
 //
 // Initialisation générale
@@ -175,6 +178,16 @@ void draw() {
 //
 ////////////////////////////////////////////////////////////////////////////////////////
 void calculeScore() {
+  /// TODO: Ajout de differentes methodes de score
+  score = -solX / echelle.x;
+  // Cette manière de voir les paliers s'était imposée d'elle-même car le jeu parfois
+  /// "Sautait" des paliers (le score est flottant), donc il aurait fallu que j'en fasse
+  /// un teste incluant un intervalle, mais ce faisant, le son sera déclenché
+  /// plus qu'une fois
+  if (score > palier) {
+    palier += 100;
+    //SOUND_BUG::sounds[CENT_SOUND].play();
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -251,6 +264,42 @@ void mouvementDino() {
 //
 ////////////////////////////////////////////////////////////////////////////////////////
 void afficheScore() {
+  // Nous utiliserons la couleur de texte définie comme une variable pour:
+  /// Eviter les effets de bords liés à l'utilisation de fill pour d'autres but (dessin d'un rond rouge par exemple), ce qui aura un impact sur la couleur du texte
+  /// Pouvoir à terme avoir la possibilité de la modifier
+  // J'utilise 127 pour pouvoir réécrire par dessus le texte à afficher "en gras"
+  fill(64, 127);
+
+  // De m\u00eame que pour la ligne précédente, si une autre fonction modifie l'alignement du texte, il ne sera pas comme nous le souhaitons
+  textAlign(RIGHT, TOP);
+
+  // Le score était à mon gout un peu trop gros
+  textSize(TEXT_SIZE / 2);
+
+  /// TODO: HC xxxxxx est un peu moin opaque
+
+  // J'utilise une variable pour que le message soit affiché en un seul bloc,
+  /// sans bidouiller pour que chacun des blocs de texte se suivent
+  String string = "HC ";
+
+  // Une boucle pour rajouter le bon nombre de 0 (s'il y a moin de 0 "0",
+  /// la boucle de se lance pas), puis un ajout du score, les int() servent
+  /// à afficher la valeur entiere des variables qui sont en float pour
+  /// plus de précision.
+  for (int i = 0; i < 6 - str(PApplet.parseInt(highScore)).length(); ++i)string += "0";
+  string += PApplet.parseInt(highScore);
+
+  // Un espace entre les mors
+  string += " ";
+
+  for (int i = 0; i < max(0, 6 - str(PApplet.parseInt(score)).length()); ++i)string += "0";
+  string += PApplet.parseInt(score);
+
+  // La présentation du texte est celle de Google Chrome
+  text(string, width, 0);
+  // Nous affichons le score en "gras" en trouvant le premier espace (en excluant le premier),
+  /// et en réécrivant par dessus
+  text(string.substring(string.indexOf(" ", 3) + 1), width, 0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
