@@ -379,7 +379,9 @@ void afficheSprites() {
     (position.x * echelle.x) + referentiel.x, (position.y * echelle.y) + referentiel.y);
 
   for (float[] i : cactuses) {
-    if (i[POS] > 0) {
+    if (i[POS] > referentiel.x - 50) {
+      ///reference.x: ordonnée du 0
+      ///50 -> pour le cacher avant 
       image(cactusImgs[(int) i[TYPE]], (echelle.x * i[POS]) + referentiel.x, referentiel.y);
     }
   }
