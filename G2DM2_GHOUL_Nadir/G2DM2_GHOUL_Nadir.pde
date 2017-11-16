@@ -1,7 +1,7 @@
 //
 // importation de la librairie son
 //
-//SOUNDBUGimport processing.sound.*;
+//SOUND_BUG::import processing.sound.*;
 
 ////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -19,8 +19,8 @@ PImage solImg, dinoImgs[], cactusImgs[];
 
 // les sons
 /// De même, j'utilise un tableau pour faire référence aux sons, avec les constantes:
-///  JUMP_SOUND, DEATH_SOUND, TODO: add more
-//SOUNDBUGSoundFile sons[]; 
+///  JUMP_SOUND, DEATH_SOUND, CENT_SOUND, ... TODO: add more
+//SOUND_BUG::SOUNDBUGSoundFile sons[]; 
 
 
 // la police de caractères
@@ -32,7 +32,7 @@ final int JUMP_PIC = 2, DEATH_PIC = 3;
 /// Les constantes associées aux cactuses (à leurs images)
 final int SIMPLE = 0, TRIPLE = 1;
 /// Les indices des sons
-final int JUMP_SOUND = 0, DEATH_SOUND = 1;
+final int JUMP_SOUND = 0, DEATH_SOUND = 1, CENT_SOUND = 2;
 
 ////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -100,7 +100,11 @@ void setup() {
   dinoImgs[DEATH_PIC] = loadImage("dinoMort.png");
 
   // charge les sons
-  //SOUNDBUGsonCent = new SoundFile(this, "cent.mp3");
+  //SOUND_BUG::sons = newSoundFile[3];
+  //SOUND_BUG::sounds[JUMP_SOUND] = new SoundFile(this, "saut.mp3");
+  //SOUND_BUG::sounds[DEATH_SOUND] = new SoundFile(this, "boom.mp3");
+  //SOUND_BUG::sounds[CENT_SOUND] = new SoundFile(this, "cent.mp3");
+
 
   /// Les variables de débogage
   dSpeedFollowsMouse = false;
@@ -280,6 +284,7 @@ void keyPressed() {
   } else if (key == CODED && keyCode == UP) {
     if (position.y < 10) {
       vitesse.y = jumpSpeed;
+      //SOUND_BUG::sounds[JUMP_SOUND].play();
     }
   } else {/// Cheat codes
     /// Spécificitées de l'ASCII: les minuscules sont à 32 près des majuscules
