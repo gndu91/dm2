@@ -341,14 +341,14 @@ void afficheScore() {
   /// la boucle de se lance pas), puis un ajout du score, les int() servent
   /// à afficher la valeur entiere des variables qui sont en float pour
   /// plus de précision.
-  for (int i = 0; i < 6 - str(PApplet.parseInt(highScore)).length(); ++i)string += "0";
-  string += PApplet.parseInt(highScore);
+  for (int i = 0; i < 6 - str(int(highScore)).length(); ++i)string += "0";
+  string += int(highScore);
 
   // Un espace entre les mors
   string += " ";
 
-  for (int i = 0; i < max(0, 6 - str(PApplet.parseInt(score)).length()); ++i)string += "0";
-  string += PApplet.parseInt(score);
+  for (int i = 0; i < max(0, 6 - str(int(score)).length()); ++i)string += "0";
+  string += int(score);
 
   // La présentation du texte est celle de Google Chrome
   text(string, width, 0);
