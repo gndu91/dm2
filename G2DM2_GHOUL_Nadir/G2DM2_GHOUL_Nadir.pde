@@ -72,6 +72,7 @@ float dT = 50 * 0.001;
 /// Les variables de débogage
 boolean dSpeedFollowsMouse;
 boolean dGravityFollowsMouse;
+boolean dShowHitBoxes;
 
 ///Le texte
 final int TEXT_SIZE = 32;
@@ -120,6 +121,7 @@ void setup() {
   /// Les variables de débogage
   dSpeedFollowsMouse = false;
   dGravityFollowsMouse = false;
+  dShowHitBoxes = true;
 
   /// La vitesse initiale de saut: 
   jumpSpeed = vitesseSaut0;
