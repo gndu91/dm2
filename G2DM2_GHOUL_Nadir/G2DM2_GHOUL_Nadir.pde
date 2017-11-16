@@ -71,6 +71,7 @@ float dT = 50 * 0.001;
 
 /// Les variables de débogage
 boolean dSpeedFollowsMouse;
+boolean dSpeedSquared;// Y evolue en fonction de x
 boolean dGravityFollowsMouse;
 boolean dShowCommandBar;
 boolean dShowHitBoxes;
@@ -304,6 +305,7 @@ void mouvementCactus() {
 //
 ////////////////////////////////////////////////////////////////////////////////////////
 void mouvementDino() {
+  /// La base: on incrémente la vitesse
   position.y += vitesse.y;
   if (position.y < 0) {
     position.y = 0;
@@ -413,6 +415,9 @@ void keyPressed() {
       break;
     case 'g':
       dGravityFollowsMouse = !dGravityFollowsMouse;
+      break;
+    case 's':
+      dSpeedSquared = !dSpeedSquared;
       break;
     }
   }
