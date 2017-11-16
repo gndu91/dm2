@@ -182,7 +182,8 @@ void draw() {
   }
   // sinon
   else {
-    textAlign(CENTER);textSize(TEXT_SIZE);
+    textAlign(CENTER);
+    textSize(TEXT_SIZE);
     text("G A M E  O V E R", width/2, height/2);
   }
 }
@@ -232,6 +233,8 @@ void testeCollisions() {
 //
 ////////////////////////////////////////////////////////////////////////////////////////
 void debugTools() {
+  // TODO: Add pages
+  
   if (dSpeedFollowsMouse) {
     vitesse.x = mouseX;
   } else if (dGravityFollowsMouse) {
@@ -244,6 +247,8 @@ void debugTools() {
   textAlign(TOP, LEFT);
   textSize(TEXT_SIZE / 3);
   text("Vitesse de saut               " + jumpSpeed, 0, y);
+  y += TEXT_SIZE / 3;
+  text("Acceleration gravitationnelle " + g, 0, y);
   y += TEXT_SIZE / 3;
   text("Vitessed de défilement        " + vitesse.x, 0, y);
   y += TEXT_SIZE / 3;
