@@ -55,6 +55,10 @@ float jumpSpeed, g;
 float solX;
 
 ////////////////////////////////////////////////////////////////////////////////////////
+float cactuses[][], NB_MAX_CACTUSES = 10;
+final int TYPE = 0, POS = 1;
+
+////////////////////////////////////////////////////////////////////////////////////////
 //
 // les paramètres généraux
 //
@@ -102,6 +106,10 @@ void setup() {
   dinoImgs[JUMP_PIC] = loadImage("dinoSaut.png");
   dinoImgs[DEATH_PIC] = loadImage("dinoMort.png");
 
+  cactusImgs = new PImage[4];
+  cactusImgs[SIMPLE] = loadImage("cactus1.png");
+  cactusImgs[TRIPLE] = loadImage("cactus2.png");
+
   // charge les sons
   //SOUND_BUG::sons = newSoundFile[3];
   //SOUND_BUG::sounds[JUMP_SOUND] = new SoundFile(this, "saut.mp3");
@@ -116,6 +124,11 @@ void setup() {
   /// La vitesse initiale de saut: 
   jumpSpeed = vitesseSaut0;
   g = g0;
+
+  cactuses = new float[(int) NB_MAX_CACTUSES][2];
+  for (float[] i : cactuses) {
+    i[TYPE] = i[POS] = -1;
+  }
 
   initJeu();
   gameOver = true;
@@ -196,6 +209,19 @@ void calculeScore() {
 //
 ////////////////////////////////////////////////////////////////////////////////////////
 void testeCollisions() {
+  if(!dImmortal) {
+    for (float[] i : cactuses) {
+      if (i[POS] > 0) {
+        float x = (echelle.x * i[POS]) + referentiel.x;
+        float y = referentiel.y;
+        float h = dinoImgs[(int) i[TYPE]].height;
+        float w = dinoImgs[(int) i[TYPE]].width;
+        if(dShowHitBoxes) {
+          ellipse(x, y, 10, 10);
+        }
+      }
+    }
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -219,6 +245,11 @@ void debugTools() {
   y += TEXT_SIZE / 3;
   text("Vitessed de défilement        " + vitesse.x, 0, y);
   y += TEXT_SIZE / 3;
+
+  for (float[] i : cactuses) {
+    text("Cactus " + (i[TYPE] == SIMPLE ? "SIMPLE" : i[TYPE] == TRIPLE ? "TRIPLE" : "??????") + " " + i[POS], 0, y);
+    y += TEXT_SIZE / 3;
+  }
 }
 ////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -241,6 +272,16 @@ void mouvementSol() {
 //
 ////////////////////////////////////////////////////////////////////////////////////////
 void mouvementCactus() {
+  if (random(0, 100) < 1) {
+    float[] cactus = cactuses[(int) random(0, cactuses.length)];
+    if (cactus[POS] < 0) {
+      cactus[TYPE] = random(0, 50) < 25 ? SIMPLE : TRIPLE;
+      cactus[POS] = (int) (width * 1.1 / echelle.x);
+    }
+  }
+  for (float[]i : cactuses) {
+    i[POS] -= (vitesse.x * dT);
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -322,6 +363,12 @@ void afficheSprites() {
   // Affiche le dino TODO: Faire mieux
   image(dinoImgs[position.y < 10 ? (int) (frameCount * vitesse.x / 1000) % 2 : gameOver ? DEATH_PIC : JUMP_PIC], 
     (position.x * echelle.x) + referentiel.x, (position.y * echelle.y) + referentiel.y);
+
+  for (float[] i : cactuses) {
+    if (i[POS] > 0) {
+      image(cactusImgs[(int) i[TYPE]], (echelle.x * i[POS]) + referentiel.x, referentiel.y);
+    }
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
