@@ -44,7 +44,7 @@ PVector referentiel, echelle, vitesse, position;
 
 /// La vitesse initiale du saut et la force de pesanteur
 //final float g0 = 9.81, vitesseSaut0 = 98.1;
-final float g0 = 1, vitesseSaut0 = 20;
+final float g0 = 0.75, vitesseSaut0 = 15;
 
 float jumpSpeed, g;
 
