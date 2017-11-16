@@ -57,6 +57,7 @@ float solX;
 ////////////////////////////////////////////////////////////////////////////////////////
 float cactuses[][], NB_MAX_CACTUSES = 10;
 final int TYPE = 0, POS = 1;
+float rarete;
 
 ////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -75,6 +76,7 @@ boolean dSpeedSquared;// Y evolue en fonction de x
 boolean dGravityFollowsMouse;
 boolean dShowCommandBar;
 boolean dShowHitBoxes;
+boolean dRareteMouse;
 boolean dImmortal;
 
 String command;
@@ -128,6 +130,7 @@ void setup() {
   dGravityFollowsMouse = false;
   dShowCommandBar = false;
   dShowHitBoxes = true;
+  dRareteMouse = false;
   dImmortal = false;
   command = "";
 
@@ -158,6 +161,8 @@ void initJeu() {
   vitesse = new PVector(40, 0);// Il va vers la droite
   position = new PVector(0, 0);// Il définit l'origine
 
+  // La rareté évolue au cours du jeu, elle doit donc être réinitialisée ici
+  rarete = 100;
 
   // initialise le sol
   solX = 0;
@@ -250,14 +255,27 @@ void debugTools() {
     g = 100 * g0 / mouseY;
     /// TODO: Create a global 32
   }
+  if(dSpeedSquared) {
+    vitesse.y = vitesse.x;
+  }
+  if(dRareteMouse) {
+    rarete = mouseY;
+  }
+  
   float y = TEXT_SIZE / 3;
 
   textAlign(TOP, LEFT);
   textSize(TEXT_SIZE / 3);
+  
+  text("Position                      " + position.y, 0, y);
+  y += TEXT_SIZE / 3;
+  
   text("Vitesse de saut               " + jumpSpeed, 0, y);
   y += TEXT_SIZE / 3;
+  
   text("Acceleration gravitationnelle " + g, 0, y);
   y += TEXT_SIZE / 3;
+  
   text("Vitessed de défilement        " + vitesse.x, 0, y);
   y += TEXT_SIZE / 3;
 
@@ -265,6 +283,9 @@ void debugTools() {
     text("Cactus " + (i[TYPE] == SIMPLE ? "SIMPLE" : i[TYPE] == TRIPLE ? "TRIPLE" : "??????") + " " + i[POS], 0, y);
     y += TEXT_SIZE / 3;
   }
+  
+  text("Rareté des cactus             " + rarete, 0, y);
+  y += TEXT_SIZE / 3;
 }
 ////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -287,7 +308,7 @@ void mouvementSol() {
 //
 ////////////////////////////////////////////////////////////////////////////////////////
 void mouvementCactus() {
-  if (random(0, 100) < 1) {
+  if (random(0, rarete) < 1) {
     float[] cactus = cactuses[(int) random(0, cactuses.length)];
     if (cactus[POS] < 0) {
       cactus[TYPE] = random(0, 50) < 25 ? SIMPLE : TRIPLE;
@@ -418,6 +439,9 @@ void keyPressed() {
       break;
     case 's':
       dSpeedSquared = !dSpeedSquared;
+      break;
+    case 'r':
+      dRareteMouse = !dRareteMouse;
       break;
     }
   }
