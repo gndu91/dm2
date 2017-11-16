@@ -198,10 +198,14 @@ void debugTools() {
     g = 100 * g0 / mouseY;
     /// TODO: Create a global 32
   }
-  textAlign(TOP, LEFT);textSize(TEXT_SIZE / 3);
-  text("Vitesse de saut               " + jumpSpeed, 0, TEXT_SIZE / 3);
-  text("Acceleration gravitationnelle " + g,         0, TEXT_SIZE * 2 / 3);
-  text("Vitessed de défilement        " + vitesse.x, 0, TEXT_SIZE);
+  float y = TEXT_SIZE / 3;
+
+  textAlign(TOP, LEFT);
+  textSize(TEXT_SIZE / 3);
+  text("Vitesse de saut               " + jumpSpeed, 0, y);
+  y += TEXT_SIZE / 3;
+  text("Vitessed de défilement        " + vitesse.x, 0, y);
+  y += TEXT_SIZE / 3;
 }
 ////////////////////////////////////////////////////////////////////////////////////////
 //
