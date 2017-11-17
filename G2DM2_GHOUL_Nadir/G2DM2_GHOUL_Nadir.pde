@@ -80,11 +80,17 @@ boolean dRareteMouse;
 boolean dPrediction;
 boolean dImmortal;
 
+boolean dJumping;
+boolean dSlowLanding;
+
 
 /// Pour ralentir le temps de manière progressive
 boolean dAutoSlowDown;
 boolean dSlowDown;
 int dSlowDownRate;
+float dSlowDownIncrement;
+boolean dTooMuchSlowDown;
+float dTooMuchSlowDownLimit;
 
 /// Ralentis le temps quand je m'approche trop des cactus
 boolean dHelp;
@@ -153,12 +159,19 @@ void setup() {
   dShowHitBoxes = true;
   dRareteMouse = false;
   dPrediction = true;
+  dJumping = false;
+  dSlowLanding = true;
   debug = true;
+  
   dHelp = true;
 
   dSlowDown = false;
   dAutoSlowDown = false;
   dSlowDownRate = 0;
+  dSlowDownIncrement = 0.9;
+  /// Si nous ralentissons trop, alors accelerer jusqu'à avoir une vitesse normale
+  dTooMuchSlowDown = false;
+  dTooMuchSlowDownLimit = 50;
 
   hitBoxRadius = 5;
 
@@ -192,7 +205,7 @@ void initJeu() {
 
   // initialise le sol
   solX = 0;
-  
+
   cactuses = new float[(int) NB_MAX_CACTUSES][2];
   for (float[] i : cactuses) {
     i[TYPE] = i[POS] = -1;
@@ -212,16 +225,37 @@ void draw() {
 
   debugTools();
 
-  if (dSlowDown || dAutoSlowDown) {
-    if (dSlowDownRate < 100) {
+  
+  boolean slowLanding = dJumping && vitesse.y < 0 && dSlowLanding;
+  
+  /// Trois cas peuvent mener à un ralentissement du temps:
+  ///  un ralentissement ordonné par l'utilisateur (dSlowDown)
+  ///  un ralentissement ordonné par l'ordinateur (dAutoSlowdown)
+  ///  un ralentissement lié à la fin de saut ralentie (slowLanding)
+  /// Pour les deux premier cas, nous prendrons pour limite dTooMuchSlowDownLimit, sinon 
+  ///  nous prendrons le tiers de cette limite
+  /// TODO: Pk 3 et pa 4 ou 5?
+  if(!dTooMuchSlowDown && (slowLanding  || dSlowDown || dAutoSlowDown)) {
+    if (dSlowDownRate < (dTooMuchSlowDownLimit)) {
+    
+  }
+  if(!dTooMuchSlowDown && ()) {
       dSlowDownRate += 1;
-      dT *= 0.9;
+      dT *= dSlowDownIncrement;
+    } else {
+      dTooMuchSlowDown = true;
     }
   } else {
     if (dSlowDownRate > 0) {
-      dSlowDownRate -= 2;
-      dT /= 0.9;
-      dT /= 0.9;
+      if(dSlowDownRate > 1) {
+        dSlowDownRate -= 2;
+        dT /= dSlowDownIncrement * dSlowDownIncrement;
+      } else {
+        dSlowDownRate -= 1;
+        dT /= dSlowDownIncrement;
+      }
+    } else {
+      dTooMuchSlowDown = false;
     }
   }
 
@@ -286,14 +320,22 @@ void calculeScore() {
 //
 ////////////////////////////////////////////////////////////////////////////////////////
 boolean collision(float X, float Y) {/// Position du dino
+  strokeWeight(1);
+
+  X = (echelle.x * X) + referentiel.x;
+  Y = (echelle.y * Y) + referentiel.y;
+  if (dShowHitBoxes) {
+    ellipse(X, Y, hitBoxRadius * 2, hitBoxRadius * 2);
+  }
+
   float y = referentiel.y;
   /// Nous pouvons retourner la valeur en cas de choc ou attendre pour afficher toutes les hitbox
   ///   boolean value;
 
-/// TODO: Peut-être remplacé par des contantes;
-float h = dinoImgs[0].height;
-float w = dinoImgs[0].width;
-float r = sqrt(pow(h / 2, 2) + pow(w / 2, 2));
+  /// TODO: Peut-être remplacé par des contantes;
+  float h = dinoImgs[0].height;
+  float w = dinoImgs[0].width;
+  float r = sqrt(pow(h / 2, 2) + pow(w / 2, 2));
 
   for (float[] i : cactuses) {
     /// TODO: Tester si cela est un bon test
@@ -303,7 +345,7 @@ float r = sqrt(pow(h / 2, 2) + pow(w / 2, 2));
         /// TODO: Afficher le cercle dans une autre couleur
         ellipse(x, y, h, w);
       }
-      if(sqrt(pow(x - X, 2) + pow(y - Y, 2)) < (hitBoxRadius + r)) {
+      if (sqrt(pow(x - X, 2) + pow(y - Y, 2)) < (hitBoxRadius + r)) {
         return true;
       }
     }
@@ -314,14 +356,9 @@ float r = sqrt(pow(h / 2, 2) + pow(w / 2, 2));
 ////////////////////////////////////////////////////////////////////////////////////////
 void testeCollisions() {
   boolean mustSlowDown = false;
-  float X = (echelle.x * position.x) + referentiel.x;
-  float Y = (echelle.y * position.y) + referentiel.y;
-  if (dShowHitBoxes) {
-    ellipse(X, Y, hitBoxRadius * 2, hitBoxRadius * 2);
-  }
   // Le décalage n'a pas d'importance
   if (!dImmortal) {
-    if (collision(X, Y)) {
+    if (collision(position.x, position.y)) {
       gameOver = true;
     }
   }
@@ -384,7 +421,6 @@ void debugTools() {
   /// Ligne vide
   y += TEXT_SIZE / 3;
 
-
   text("Affichage des hit boxes       " + (dShowHitBoxes ? "ON" : "OFF"), x, y);
   y += TEXT_SIZE / 3;
 
@@ -394,6 +430,17 @@ void debugTools() {
   text("Vous êtes                     " + (dImmortal ? "invincible" : "mortel"), x, y);
   y += TEXT_SIZE / 3;
 
+  /// Ligne vide
+  y += TEXT_SIZE / 3;
+
+  text("Saut en cours                 " + (dJumping ? "OUI" : "NON"), x, y);
+  y += TEXT_SIZE / 3;
+
+  text("Atterissage lent              " + (dSlowLanding ? "ON" : "OFF"), x, y);
+  y += TEXT_SIZE / 3;
+  
+  text("Ralentissement actuel         " + dSlowDownRate, x, y);
+  y += TEXT_SIZE / 3;
 
 
 
@@ -455,9 +502,13 @@ void mouvementDino() {
   if (position.y < 0) {
     position.y = 0;
     vitesse.y = 0;
+    dJumping = false;
   } else if (position.y > 0) {
     vitesse.y -= g * dT;
   }
+
+  // On fera des dessins plus bas
+  strokeWeight(1);
 
   /// Prédit les prochains emplacements,  pour cela, nous devrons connaitre les conditions initiales
   ///  sans pour autant modifier les variables, et pour faire des lignes, il faut deux points
@@ -485,11 +536,17 @@ void mouvementDino() {
   /// TODO: Creer une fonction retournant uniquement les cactus visibles
 
   /// Si nous sommes au sol, alors nous aurons une prédiction hypotétique
-  fill(position.y < 10 ? #00ff00 : #0000ff, 127);
+  //fill((position.y < 10 ? #00ff00 : #0000ff), 255);
+  /// TODO:Combiner ce facteur avec le facteur collision
 
   /// TODO: Changer l'algo, ne pas afficher en temps réel, mais stocker dans un array
 
-  int[][] positions = new int[0][0];
+  float[][] positions = new float[1000][2];
+  println(positions.length + " positions");
+  // Ceci évite les calculs inutiles
+  int index = 0, tombeDepuis = 0;
+  /// On considere que l'utilisateur ne 
+  final int tempsDeReaction = 3;
 
   ///  Boucler jusqu'à la fin, c'est à dire jusqu'à que nous atteignons le sol
   ///    quand les points sont trop raprochés, nous devrons les séparer
@@ -497,9 +554,8 @@ void mouvementDino() {
   ///    renter dedans
   ///  On commence par incrémenter x, sinin le premier sera juste au dessus
   ///    de la position actuelle
-  for (x += vitesse.x * dT; x < width / echelle.x; x += vitesse.x * dT) {
-    positions.append(new int[2]);
-    
+  for (x += vitesse.x * dT; x < width / echelle.x && (index < positions.length); x += vitesse.x * dT) {
+
     /// Ceci n'est qu'une copie de ce que vous pouvez voir au début de cette fonction
     y += vY * dT;
     if (y < 0) {
@@ -507,20 +563,60 @@ void mouvementDino() {
       vY = 0;
     } else if (y > 0) {
       vY -= g * dT;
+      /// Ceci est calculé quand la postion du sol est mise à jour
+      vX += acceleration.x * dT;
+    } 
+    if(tombeDepuis > tempsDeReaction) {
+      vX *= 2;
     }
+    
+    /// Ajout du couple de coordonnées à la liste
+    positions[index][0] = x;
+    positions[index][1] = y;
+    
+    
+    println(tombeDepuis);
+    tombeDepuis = y < 1 ? tombeDepuis + 1 : 0;
 
-    /// Ceci est calculé quand la postion du sol est mise à jour
-    vX += acceleration.x * dT;
-    if (dContinuousTrajectory) {
+    index++;
+  }
+
+  boolean willCollide = false;
+  tombeDepuis = 0;
+  /// Nous ne voulons pas que les box soit affichées encore et encore
+  boolean show = dShowHitBoxes;
+  dShowHitBoxes = false;
+
+  /// Si nous savons que cela ne va pas psser, nous n'avos pas à recalculer
+  // On itere de 0 à len - 2 car on va utiliser i + 1
+  for (int i = 0; i < index && !willCollide && tombeDepuis < tempsDeReaction; ++i) {
+    // positions[i] = {x, y}
+    tombeDepuis = positions[i][1] < 1 ? tombeDepuis + 1 : 0;
+    willCollide = collision(positions[i][0], positions[i][1]);
+  }
+
+  dShowHitBoxes = show;
+
+  /// Rouge si nous allons toucher, vert sinon
+  fill(willCollide ? #ff0000 : #00ff00, 64);
+  println("Will" + (willCollide ? " " : " not ") + "collide");
+  // TODO: Réparer les effets de bords causés par cette ligne
+
+  // On itere de 0 à len - 2 car on va utiliser i + 1
+  for (int i = 0; i + 1 < index; ++i) {
+    // positions[i] = {x, y}
+    /// TODO: Inutile de charger des cases en plus
+    x = positions[i][0];
+    y = positions[i][1];
+    _x = positions[i + 1][0];
+    _y = positions[i + 1][1];
+//    if (dContinuousTrajectory) {
       line((_x * echelle.x) + referentiel.x, (_y * echelle.y) + referentiel.y, 
         (x * echelle.x) + referentiel.x, (y * echelle.y) + referentiel.y);
-    } else {
+  //  } else {
       ellipse((x * echelle.x) + referentiel.x, 
         (y * echelle.y) + referentiel.y, hitBoxRadius * 2, hitBoxRadius * 2);
-    }
-    /// Sauvegarde de la position actuelle pour pouvoir tracer une ligne
-    _x = x;
-    _y = y;
+    //}
   }
 }
 
@@ -608,6 +704,7 @@ void keyPressed() {
   } else if (key == CODED && keyCode == UP) {
     if (position.y < 10) {
       vitesse.y = jumpSpeed;
+      dJumping = true;
       // SOUND ERROR: sounds[JUMP_SOUND].play();
     }
   } else if (dShowCommandBar && key != '²') {
