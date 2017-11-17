@@ -1,7 +1,7 @@
 //
 // importation de la librairie son
 //
-import processing.sound.*;
+// SOUND ERROR: import processing.sound.*;
 
 ////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -20,7 +20,7 @@ PImage solImg, dinoImgs[], cactusImgs[];
 // les sons
 /// De même, j'utilise un tableau pour faire référence aux sons, avec les constantes:
 ///  JUMP_SOUND, DEATH_SOUND, CENT_SOUND, ... TODO: add more
-SoundFile sounds[]; 
+// SOUND ERROR: SoundFile sounds[]; 
 
 
 // la police de caractères
@@ -68,7 +68,7 @@ float rarete;
 boolean gameOver;
 
 // 50 milisecondes
-float dT = 50 * 0.001;
+float dT = 0.05;
 
 /// Les variables de débogage
 boolean dSpeedFollowsMouse;
@@ -79,6 +79,19 @@ boolean dShowHitBoxes;
 boolean dRareteMouse;
 boolean dPrediction;
 boolean dImmortal;
+
+
+/// Pour ralentir le temps de manière progressive
+boolean dAutoSlowDown;
+boolean dSlowDown;
+int dSlowDownRate;
+
+/// Ralentis le temps quand je m'approche trop des cactus
+boolean dHelp;
+
+/// Cette variable sert a decider si nous tracons des lignes ou des lignes
+boolean dContinuousTrajectory;
+
 boolean debug;
 
 String command;
@@ -123,22 +136,29 @@ void setup() {
   cactusImgs[TRIPLE] = loadImage("cactus2.png");
 
   // charge les sons
-  sounds = new SoundFile[3];
-  sounds[JUMP_SOUND] = new SoundFile(this, "saut.mp3");
-  sounds[DEATH_SOUND] = new SoundFile(this, "boom.mp3");
-  sounds[CENT_SOUND] = new SoundFile(this, "cent.mp3");
-  
+  // SOUND ERROR: sounds = new SoundFile[3];
+  // SOUND ERROR: sounds[JUMP_SOUND] = new SoundFile(this, "saut.mp3");
+  // SOUND ERROR: sounds[DEATH_SOUND] = new SoundFile(this, "boom.mp3");
+  // SOUND ERROR: sounds[CENT_SOUND] = new SoundFile(this, "cent.mp3");
+
   acceleration = new PVector(2, g);
 
 
   /// Les variables de débogage
   dSpeedFollowsMouse = false;
   dGravityFollowsMouse = false;
+  //// TODO: Show
+  dContinuousTrajectory = false;
   dShowCommandBar = false;
   dShowHitBoxes = true;
   dRareteMouse = false;
   dPrediction = true;
-  debug = false;
+  debug = true;
+  dHelp = true;
+
+  dSlowDown = false;
+  dAutoSlowDown = false;
+  dSlowDownRate = 0;
 
   hitBoxRadius = 5;
 
@@ -148,11 +168,6 @@ void setup() {
   /// La vitesse initiale de saut: 
   jumpSpeed = vitesseSaut0;
   g = g0;
-
-  cactuses = new float[(int) NB_MAX_CACTUSES][2];
-  for (float[] i : cactuses) {
-    i[TYPE] = i[POS] = -1;
-  }
 
   initJeu();
   gameOver = true;
@@ -177,6 +192,11 @@ void initJeu() {
 
   // initialise le sol
   solX = 0;
+  
+  cactuses = new float[(int) NB_MAX_CACTUSES][2];
+  for (float[] i : cactuses) {
+    i[TYPE] = i[POS] = -1;
+  }
 
   // initialisations générales
   gameOver = false;
@@ -192,9 +212,23 @@ void draw() {
 
   debugTools();
 
+  if (dSlowDown || dAutoSlowDown) {
+    if (dSlowDownRate < 100) {
+      dSlowDownRate += 1;
+      dT *= 0.9;
+    }
+  } else {
+    if (dSlowDownRate > 0) {
+      dSlowDownRate -= 2;
+      dT /= 0.9;
+      dT /= 0.9;
+    }
+  }
+
   // met à jour l'affichage
   afficheScore();
   afficheSprites();
+
 
 
   if (score % 1000 > 750) {
@@ -242,7 +276,7 @@ void calculeScore() {
   /// plus qu'une fois
   if (score > palier) {
     palier += 100;
-    sounds[CENT_SOUND].play();
+    // SOUND ERROR: sounds[CENT_SOUND].play();
   }
 }
 
@@ -251,27 +285,47 @@ void calculeScore() {
 // teste la collision entre le dino et un cactus
 //
 ////////////////////////////////////////////////////////////////////////////////////////
+boolean collision(float X, float Y) {/// Position du dino
+  float y = referentiel.y;
+  /// Nous pouvons retourner la valeur en cas de choc ou attendre pour afficher toutes les hitbox
+  ///   boolean value;
+
+/// TODO: Peut-être remplacé par des contantes;
+float h = dinoImgs[0].height;
+float w = dinoImgs[0].width;
+float r = sqrt(pow(h / 2, 2) + pow(w / 2, 2));
+
+  for (float[] i : cactuses) {
+    /// TODO: Tester si cela est un bon test
+    if (i[TYPE] > -1 && (i[POS] + 50 > referentiel.x)) {
+      float x = (echelle.x * i[POS]) + referentiel.x;
+      if (dShowHitBoxes) {
+        /// TODO: Afficher le cercle dans une autre couleur
+        ellipse(x, y, h, w);
+      }
+      if(sqrt(pow(x - X, 2) + pow(y - Y, 2)) < (hitBoxRadius + r)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
 void testeCollisions() {
+  boolean mustSlowDown = false;
   float X = (echelle.x * position.x) + referentiel.x;
   float Y = (echelle.y * position.y) + referentiel.y;
   if (dShowHitBoxes) {
     ellipse(X, Y, hitBoxRadius * 2, hitBoxRadius * 2);
   }
-  for (float[] i : cactuses) {
-    if (i[TYPE] > -1 && (i[POS] + 50 > referentiel.x)) {
-      // Le décalage n'a pas d'importance
-      float x = (echelle.x * i[POS]) + referentiel.x;
-      float y = referentiel.y;
-      float h = dinoImgs[(int) i[TYPE]].height;
-      float w = dinoImgs[(int) i[TYPE]].width;
-      if (dShowHitBoxes) {
-        ellipse(x, y, h, w);
-      }
-      if (!dImmortal) {
-        // if(0);
-      }
+  // Le décalage n'a pas d'importance
+  if (!dImmortal) {
+    if (collision(X, Y)) {
+      gameOver = true;
     }
   }
+  dAutoSlowDown = mustSlowDown;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -281,8 +335,8 @@ void testeCollisions() {
 ////////////////////////////////////////////////////////////////////////////////////////
 void debugTools() {
   // TODO: Add pages
-  
-  if(!debug) {
+
+  if (!debug) {
     return;
   }
 
@@ -318,12 +372,23 @@ void debugTools() {
   text("Vitessed de défilement        " + vitesse.x, x, y);
   y += TEXT_SIZE / 3;
 
+  text("Vitessed verticale            " + vitesse.y, x, y);
   y += TEXT_SIZE / 3;
+
+  /// Ligne vide
+  y += TEXT_SIZE / 3;
+
+  text("Temps entre deux frames       " + dT, x, y);
+  y += TEXT_SIZE / 3;
+
+  /// Ligne vide
+  y += TEXT_SIZE / 3;
+
 
   text("Affichage des hit boxes       " + (dShowHitBoxes ? "ON" : "OFF"), x, y);
   y += TEXT_SIZE / 3;
 
-  text("Rayon des hitt boxes          " + hitBoxRadius, x, y);
+  text("Rayon des hit boxes           " + hitBoxRadius, x, y);
   y += TEXT_SIZE / 3;
 
   text("Vous êtes                     " + (dImmortal ? "invincible" : "mortel"), x, y);
@@ -394,40 +459,68 @@ void mouvementDino() {
     vitesse.y -= g * dT;
   }
 
-  float yPredicted = position.y, vPredicted = vitesse.y, vXPredicted = vitesse.x;
-  /// Prédit les prochains emplacements
-  for (float x = position.x; x < width / echelle.x; x += vitesse.x * dT) {
-    yPredicted += vPredicted * dT;
-    if (yPredicted < 0) {
-      yPredicted = 0;
-      vPredicted = 0;
-    } else if (yPredicted > 0) {
-      vPredicted -= g * dT;
+  /// Prédit les prochains emplacements,  pour cela, nous devrons connaitre les conditions initiales
+  ///  sans pour autant modifier les variables, et pour faire des lignes, il faut deux points
+  float x, y, _x, _y, vX, vY;
+
+  // Si nous sommes en plein saut, alors prendre la vitesse verticale actuelle, sinon prendre la vitesse de saut
+  vY = position.y < 1 ? jumpSpeed : vitesse.y; /// TODO: Ajout d'une constante pour toutes les incertitudes
+
+  /// XXX Nous devrons donc éviter de modifier la maniere dont la vitesse change
+  //    de plus, les changements de dT pourront avoir un impact sur la justesse de
+  //    la trajectoire ainsi calculée
+  // Nous prenons les conditions initiales sur x, y et 
+  vX = vitesse.x;
+  x = _x = position.x;
+  y = _y = position.y;
+
+  /// TODO: Changer la couleur en rouge si nous touchons un cactus, pour cela:
+  ///    faire une boucle pour chaque cactus visible
+  ///    pour chaque cactus: calculer y(x) = (yPredicted) if y < end
+
+  /// TODO: N'afficher que les points en l'air
+
+  /// TODO: Pilote automatique
+
+  /// TODO: Creer une fonction retournant uniquement les cactus visibles
+
+  /// Si nous sommes au sol, alors nous aurons une prédiction hypotétique
+  fill(position.y < 10 ? #00ff00 : #0000ff, 127);
+
+  /// TODO: Changer l'algo, ne pas afficher en temps réel, mais stocker dans un array
+
+  int[][] positions = new int[0][0];
+
+  ///  Boucler jusqu'à la fin, c'est à dire jusqu'à que nous atteignons le sol
+  ///    quand les points sont trop raprochés, nous devrons les séparer
+  ///    pour cela, nous utiliserons les rayons, les cercles ne doivent pas se
+  ///    renter dedans
+  ///  On commence par incrémenter x, sinin le premier sera juste au dessus
+  ///    de la position actuelle
+  for (x += vitesse.x * dT; x < width / echelle.x; x += vitesse.x * dT) {
+    positions.append(new int[2]);
+    
+    /// Ceci n'est qu'une copie de ce que vous pouvez voir au début de cette fonction
+    y += vY * dT;
+    if (y < 0) {
+      y = 0;
+      vY = 0;
+    } else if (y > 0) {
+      vY -= g * dT;
     }
-    ellipse((x * echelle.x) + referentiel.x, 
-            (yPredicted * echelle.y) + referentiel.y,
-            hitBoxRadius * 2, hitBoxRadius * 2);
-    /// Equation de la trajectoire
-  }
-  if (position.y < 10) {
-    fill(#00ff00, 127);
-    yPredicted = position.y;
-    vPredicted = jumpSpeed;
-    vXPredicted = vitesse.x;
-    /// Prédit les prochains emplacements
-    for (float x = position.x; x < width / echelle.x; x += vitesse.x * dT) {
-      yPredicted += vPredicted * dT;
-      if (yPredicted < 0) {
-        yPredicted = 0;
-        vPredicted = 0;
-      } else if (yPredicted > 0) {
-        vPredicted -= g * dT;
-      }
-      vXPredicted += acceleration.x * dT;
+
+    /// Ceci est calculé quand la postion du sol est mise à jour
+    vX += acceleration.x * dT;
+    if (dContinuousTrajectory) {
+      line((_x * echelle.x) + referentiel.x, (_y * echelle.y) + referentiel.y, 
+        (x * echelle.x) + referentiel.x, (y * echelle.y) + referentiel.y);
+    } else {
       ellipse((x * echelle.x) + referentiel.x, 
-        (yPredicted * echelle.y) + referentiel.y, hitBoxRadius * 2, hitBoxRadius * 2);
-      /// Equation de la trajectoire
+        (y * echelle.y) + referentiel.y, hitBoxRadius * 2, hitBoxRadius * 2);
     }
+    /// Sauvegarde de la position actuelle pour pouvoir tracer une ligne
+    _x = x;
+    _y = y;
   }
 }
 
@@ -491,19 +584,13 @@ void afficheSprites() {
   }
 
   // Affiche le dino TODO: Faire mieux
-  image(dinoImgs[position.y < 10 ? (int) (frameCount * vitesse.x / 1000) % 2 : gameOver ? DEATH_PIC : JUMP_PIC], 
+  image(dinoImgs[position.y < 10 ? (int) (frameCount * 3 / frameRate) % 2 : gameOver ? DEATH_PIC : JUMP_PIC], 
     (position.x * echelle.x) + referentiel.x, (position.y * echelle.y) + referentiel.y);
 
   for (float[] i : cactuses) {
     if (i[TYPE] > -1 && i[POS] > - referentiel.x - 50) {
       ///reference.x: ordonnée du 0
-      ///50 -> pour le cacher avant 
-      /*if(i[POS] < 0) {
-       println("Blurring " + -i[POS]);
-       cactusImgs[(int) i[TYPE]].filter(BLUR, (-i[POS]) / 50);
-       }*/
       image(cactusImgs[(int) i[TYPE]], (echelle.x * i[POS]) + referentiel.x, referentiel.y);
-      /*cactusImgs[(int) i[TYPE]].filter(BLUR, (i[POS]) / 50);*/
     }
   }
 }
@@ -521,21 +608,21 @@ void keyPressed() {
   } else if (key == CODED && keyCode == UP) {
     if (position.y < 10) {
       vitesse.y = jumpSpeed;
-      sounds[JUMP_SOUND].play();
+      // SOUND ERROR: sounds[JUMP_SOUND].play();
     }
   } else if (dShowCommandBar && key != '²') {
     char k = (char) (key | 32);
     if (k >= 'a' && k <= 'z') {
       command += k;
-    } else if(key == BACKSPACE) {
+    } else if (key == BACKSPACE) {
       command = command.substring(0, max(0, command.length() - 1));
-    } else if(key == DELETE) {
-      command = "";String a;
-    } else if(key == ENTER) {
-      if(command.equals("gravityball")) {
-      } else if(command.equals("immortal") || command.equals("invincible")) {
+    } else if (key == DELETE) {
+      command = "";
+    } else if (key == ENTER) {
+      if (command.equals("gravityball")) {
+      } else if (command.equals("immortal") || command.equals("invincible")) {
         dImmortal = !dImmortal;
-      } else if(command.equals("debug")) {
+      } else if (command.equals("debug")) {
         debug = !debug;
       }
     }
@@ -545,24 +632,34 @@ void keyPressed() {
     /// Spécificitées de l'ASCII: les minuscules sont à 32 près des majuscules
     ///  Le ou unaire '|' permet de convertir majuscule->minuscule et minuscule->minuscule
     ///  comme vu en amphi et en TD
-
-    switch(key | 32) {/// TODO: Afficher ceci
-    case 'm':
-      dSpeedFollowsMouse = !dSpeedFollowsMouse;
-      break;
-    case 'g':
-      dGravityFollowsMouse = !dGravityFollowsMouse;
-      break;
-    case 's':
-      dSpeedSquared = !dSpeedSquared;
-      break;
-    case 'r':
-      dRareteMouse = !dRareteMouse;
-      break;
-    case 'p':
-      dPrediction = !dPrediction;
-      break;
+    if (key == TAB) {
+      dSlowDown = true;
+    } else {
+      switch(key | 32) {/// TODO: Afficher ceci
+      case 'm':
+        dSpeedFollowsMouse = !dSpeedFollowsMouse;
+        break;
+      case 'g':
+        dGravityFollowsMouse = !dGravityFollowsMouse;
+        break;
+      case 's':
+        dSpeedSquared = !dSpeedSquared;
+        break;
+      case 'r':
+        dRareteMouse = !dRareteMouse;
+        break;
+      case 'p':
+        dPrediction = !dPrediction;
+        break;
+      }
     }
+  }
+}
+
+void keyReleased() {
+  if (key == TAB) {
+    /// Son effet n'est que temporaire
+    dSlowDown = false;
   }
 }
 
