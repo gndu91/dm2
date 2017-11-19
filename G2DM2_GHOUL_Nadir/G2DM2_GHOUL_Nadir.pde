@@ -203,7 +203,7 @@ void setup() {
   dinoImgs[JUMP_PIC] = loadImage("dinoSaut.png");
   dinoImgs[DEATH_PIC] = loadImage("dinoMort.png");
 
-  cactusImgs = new PImage[4];
+  cactusImgs = new PImage[2];
   cactusImgs[SIMPLE] = loadImage("cactus1.png");
   cactusImgs[TRIPLE] = loadImage("cactus2.png");
 
