@@ -125,6 +125,7 @@ float solX;
 
 ////////////////////////////////////////////////////////////////////////////////////////
 float cactuses[][], NB_MAX_CACTUSES = 10;
+float[][] dimensionsCactus;
 final int TYPE = 0, POS = 1;
 float rarete;
 
@@ -148,6 +149,9 @@ boolean dShowHitBoxes;
 boolean dRareteMouse;
 boolean dPrediction;
 boolean dImmortal;
+
+// Poursuite du curseur
+boolean dPoursuite;
 
 boolean dJumping;
 boolean dSlowLanding;
@@ -210,6 +214,81 @@ void setup() {
   cactusImgs[SIMPLE] = loadImage("cactus1.png");
   cactusImgs[TRIPLE] = loadImage("cactus2.png");
 
+  ///  Chaque élément sera du type w, h, r, Ax, Ay, Bx, By, wR, hR, rR, AxR, AyR, BxR, ByR
+  ///    w: La largeur en pixels
+  ///    h: La hauteur en pixels
+  ///    r: Le "rayon" de l'ellipse, en pixels
+  ///   Ax: L'abscice du premier foyer, relatif au centre de l'image, en pixels
+  ///   Ay: L'ordonnée du premier foyer, relatif au centre de l'image, en pixels
+  ///   Bx: L'abscice du second foyer, relatif au centre de l'image, en pixels
+  ///   By: L'ordonnée du second foyer, relatif au centre de l'image, en pixels
+  ///
+  ///  w, h, r, Ax, Ay, Bx, By sont les valeur vues plus hautes, converties en
+  ///      fonction du repere actuel, par conséquent elles doivent être mises
+  ///      à jour le plus régulièrement possible
+  ///
+  /// TODO:  "Encapsuler" les variables globales pour mettre à jour ce genre de
+  ///        variable automatiquement
+  dimensionsCactus = new float[2][14];
+
+  /// TODO: Permettre de modicier ceci pour gérer la difficultée
+  for (int i = 0; i < 2; ++i) {
+    dimensionsCactus[i][0] = cactusImgs[i].width;
+    dimensionsCactus[i][1] = cactusImgs[i].height;
+    /// Le rayon, par définition est la distance AM + MB pour tout
+    ///  point M de l'ellipse ayant pour fouers A et B, donc si
+    ///  les trois points sont alignés, alors on a AM + MB = AB + 2BM
+    ///  par symétrie, on a AB + 2MB = NA + AB + BM, avec N le point
+    ///  opposé à M, c'est à dire la symétrie de M par rapport
+    ///  au centre de [AB], donc NA + AB + BM = r, or
+    ///  NA + AB + BM est égal au plus grands des deux côtés, car
+    ///  ce que j'ai dit plus tôt s'applique uniquement dans le cas
+    ///  ou N, M, A et B sont alignés, c'est à dire sur la droite (AB).
+    /// Nous utiliserons la case numéro 6 pour respecter un certain ordre, ce
+    ///  qui sera utile lors de la mise à jour des dernière 7 valeurs, en effer
+    ///  comme cela, les cases paires < 6 sont relatives à x, les cases paires
+    ///  sont relatives à y et la 6e est x ou y en fonction de la forme
+    ///  (portrait/paysage).
+    dimensionsCactus[i][6] = max(dimensionsCactus[i][0], dimensionsCactus[i][1]);
+    /// Nous connaisons le rayon, la hauteur et la largeur, par conséquent
+    ///  ce que nous pouvons dire, c'est que les deux foyers seront alignés
+    ///  sur x si l'image est en paysage, sur y si l'image est en portrait,
+    ///  et bien sûr sur les deux si l'image est carré, par conséquent on va
+    ///  utiliser le centre de l'image comme centre du repère, et A sera la
+    ///  symétrie de B oar rapport a O, donc nous aurons un seul calcul a faire
+    /// Dans le cas ou l'image est en mode portrait
+    if (dimensionsCactus[i][0] > dimensionsCactus[i][1]) {
+      /// les ordonnées sont nulles
+      dimensionsCactus[i][3] = dimensionsCactus[i][5] = 0;
+
+      /// Maintenant, nous allons faire de même en prenant le cas limite, dans lequel
+      ///  M est cette fois sur l'axe médian à (AB), par conséquent, on a:
+      ///    -> les deux angles (BAM et ABM) sont égaux
+      ///    -> les deux distances AM et BM sont égales, or AM + BM = r, donc
+      ///        AB = BM = r / 2
+      ///    -> la distance OM est égale à la moitié du petit diamètre
+      /// Après quelques calculs que j'éspère correct, j'obtiens
+      ///  abs(x) = sqrt(pow(r / 2, 2) - pow(OM, 2))
+      ///  => théorème de pythagore
+      dimensionsCactus[i][2] = sqrt(pow(dimensionsCactus[i][6] / 2, 2) - pow(dimensionsCactus[i][1] / 2, 2));
+
+      /// Les abscicces sont opposées
+      dimensionsCactus[i][2] = -dimensionsCactus[i][4];
+    } else if (dimensionsCactus[i][0] < dimensionsCactus[i][1]) {
+      /// Pour les explications, voir plus haut, dans le cas w > h
+      dimensionsCactus[i][2] = dimensionsCactus[i][4] = 0;
+      dimensionsCactus[i][3] = sqrt(pow(dimensionsCactus[i][6] / 2, 2) - pow(dimensionsCactus[i][0] / 2, 2));
+      dimensionsCactus[i][5] = -dimensionsCactus[i][3];
+
+      /// Si les dimensions sont les mêmes, il s'agit d'un cercle
+    } else {
+      dimensionsCactus[i][2] = 
+        dimensionsCactus[i][3] = 
+        dimensionsCactus[i][4] = 
+        dimensionsCactus[i][5] = 0;
+    }
+  }  
+
   // charge les sons
   // SOUND ERROR: sounds = new SoundFile[3];
   // SOUND ERROR: sounds[JUMP_SOUND] = new SoundFile(this, "saut.mp3");
@@ -229,9 +308,11 @@ void setup() {
   dRareteMouse = false;
   dPrediction = true;
   dJumping = false;
-  dSlowLanding = true;
+  dSlowLanding = false;
   debug = true;
-  
+
+  dPoursuite = true;
+
   dHelp = true;
 
   dSlowDown = false;
@@ -275,10 +356,16 @@ void initJeu() {
   // initialise le sol
   solX = 0;
 
+  score = 0;
+
   cactuses = new float[(int) NB_MAX_CACTUSES][2];
   for (float[] i : cactuses) {
     i[TYPE] = i[POS] = -1;
   }
+
+  /// Si on meurt en sautant, alors on n'a pas le temps de mettre à jour cette
+  ///  variable, il nous fallais sauter et réaterrir pour la repasser à false
+  dJumping = false;
 
   // initialisations générales
   gameOver = false;
@@ -293,39 +380,113 @@ void draw() {
   background(255);
 
   debugTools();
+  gestionEffets();
 
-  
-  boolean slowLanding = dJumping && vitesse.y < 0 && dSlowLanding;
-  
+  // si le jeu n'est pas terminé
+  if (!gameOver) {
+    calculeScore();
+    testeCollisions();
+
+    /// Nous ne pouvons utiliser mouseMoved, parce que le dinosaure
+    ///    bouge et finira par dépasser la souris, et sa trajectoire
+    ///    ne serai recalculée qu'en cas de mouvement de celle-ci,
+    ///    sans tenir en compte du fait qu'elle bouge en permanence
+    ///    de vitesse.x
+    poursuite();
+
+    mouvementSol();
+    mouvementCactus();
+    mouvementDino();
+  }
+  // sinon
+  else {
+    textAlign(CENTER);
+    textSize(TEXT_SIZE);
+    text("G A M E  O V E R", width/2, height/2);
+    highScore = max(score, highScore);
+  }
+  if (dShowCommandBar) {
+    textAlign(BOTTOM, LEFT);
+    textSize(TEXT_SIZE);
+    fill(TEXT_COLOR, 255);
+    text("Command: " + command, 0, height);
+  }
+}
+////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Gere les différents effets, dont:
+//    le ralenti et l'accélatation du temps dT
+//    le flou et le passage jour/nuit
+//
+//  TODO: Revérifier cette procédure et au cas échéant la découper
+//
+////////////////////////////////////////////////////////////////////////////////////////
+void gestionEffets() {
+  /// En général, les conditions sont organisées pour avoir le moins possible d'indentations,
+  ///  quitte à alourdir légèrement le code
+
+  /// Dans la suite, je parler de "bloquer" et de "débloquer", ce qui correspond à un bloquage/débloquage de la fonction
+  ///  de ralentissement, à ne pas confondre aved dSlowDown, car il y a de multiples raisons de ralantir, mais quelle
+  ///  que soit la raison de le faire, si la fonction est "bloquée", on ne ralentis pas
+
   /// Trois cas peuvent mener à un ralentissement du temps:
   ///  un ralentissement ordonné par l'utilisateur (dSlowDown)
   ///  un ralentissement ordonné par l'ordinateur (dAutoSlowdown)
   ///  un ralentissement lié à la fin de saut ralentie (slowLanding)
+  boolean slowLanding = dJumping && vitesse.y < 0 && dSlowLanding;
+
+
   /// Pour les deux premier cas, nous prendrons pour limite dTooMuchSlowDownLimit, sinon 
   ///  nous prendrons le tiers de cette limite
+  float limit = (dSlowDown || dAutoSlowDown) ? dTooMuchSlowDownLimit : (dTooMuchSlowDownLimit / 3);
+  boolean limitReached = dSlowDownRate > limit;
+
+
+  /// Si nous devons ralentir et que nous ne sommes pas encore "bloqués", nous ralentissons, 
+  ///  bien sûr après avoir vérifié si nous pouvons toujours le faire, avec limitReached
+  boolean slowDown = !dTooMuchSlowDown && (slowLanding  || dSlowDown || dAutoSlowDown);
+
   /// TODO: Pk 3 et pa 4 ou 5?
-  if(!dTooMuchSlowDown && (slowLanding  || dSlowDown || dAutoSlowDown)) {
-    if (dSlowDownRate < (dTooMuchSlowDownLimit)) {
-    
-  }
-  if(!dTooMuchSlowDown && ()) {
-      dSlowDownRate += 1;
-      dT *= dSlowDownIncrement;
-    } else {
-      dTooMuchSlowDown = true;
-    }
+  /// TODO: Auto -> 1 ou 1/3?
+
+  /// Le cas ou nous ralentissons, pour l'instant les coeficients sonts les mêmes
+  if (slowDown && !limitReached) {
+    dSlowDownRate += 1;
+    dT *= dSlowDownIncrement;
+
+    /// Si la limite a été atteinte, mais que nous devons ralentir, il faut bloquer
+  } else if (slowDown) {
+    dTooMuchSlowDown = true;
+    ///  Sinon, c'est que nous n'avons pas à ralentir, dans ce cas, on vérifie si nous
+    ///    pouvons accélérer, dans ce cas, nous allons accélerer à peu près deux** fois
+    ///    plus vite* pour ne pas trop handicaper le jeu, car tant que nous avons besoin
+    ///    de temps, nous devrons ralentir (au passage, la limite est plus utile pour
+    ///    contrer d'eventuels défauts dans les algorithmes d'aides - par exemple dans
+    ///    une hypotétique aide automatique - que pour limiter le joueur, la limite
+    ///    pour celui-ci sera donc plus large).
+
+    ///  *ceci est vrai pour la première implémentation, mais en vérité, ce sera légèrement
+    ///    moins, lorsqu'il restera un nombre impair d'itérations, j'itèrerai une seule fois,
+    ///    sinon, je le ferais deux fois**, à terme, il y aura presque toujours deux** itérations,
+    ///    sauf si nous partons d'un nombre impair**, dans ce cas il n'y aura qu'une fois une simple
+    ///    itération, car les restes seront décrémentés systématiquement de deux**.
+
+    ///  **ou trois, ou quatres, ou ..., dans ce cas, nous utiliserons autre chose que la parité,
+    ///    mais le modulo, - ce qui est le cas même pour la parité
+    ///      TODO:Ajout d'une constante ou d'une maniere de changer deux si nécessaire
+  } else if (dSlowDownRate > 0) {
+
+    /// TODO: Rendre cette variable plus visible en la rendant globale par exemple
+    final int ratioDeceleration = 2;
+
+    /// Ceci est l'implémentation de ce qui a été dit plus tôt
+    dT /= (dSlowDownRate % ratioDeceleration == 0 ? pow(dSlowDownIncrement, ratioDeceleration) : dSlowDownIncrement);
+    dSlowDownRate -= dSlowDownRate % ratioDeceleration == 0 ? ratioDeceleration : 1;
+
+    /// , et si nous ne pouvons plus accélerer (on doit revenir au point de départ,
+    ///    pas plus), alors nous pouvons "débloquer"
   } else {
-    if (dSlowDownRate > 0) {
-      if(dSlowDownRate > 1) {
-        dSlowDownRate -= 2;
-        dT /= dSlowDownIncrement * dSlowDownIncrement;
-      } else {
-        dSlowDownRate -= 1;
-        dT /= dSlowDownIncrement;
-      }
-    } else {
-      dTooMuchSlowDown = false;
-    }
+    dTooMuchSlowDown = false;
   }
 
   // met à jour l'affichage
@@ -342,37 +503,34 @@ void draw() {
       filter(BLUR, 1 - (abs(score % 1000 - 800) / 50));
     }
   }
-
-  // si le jeu n'est pas terminé
-  if (!gameOver) {
-    calculeScore();
-    testeCollisions();
-    mouvementSol();
-    mouvementCactus();
-    mouvementDino();
-  }
-  // sinon
-  else {
-    textAlign(CENTER);
-    textSize(TEXT_SIZE);
-    text("G A M E  O V E R", width/2, height/2);
-  }
-  if (dShowCommandBar) {
-    textAlign(BOTTOM, LEFT);
-    textSize(TEXT_SIZE);
-    fill(TEXT_COLOR, 255);
-    text("Command: " + command, 0, height);
-  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
 //
-// calcule le score et joue un son tous les 100 
+//  Cette procédure va:
+//    - Calculer le score
+//    - Jouer le son "cent" tous les 100 points
+//
+//  Notes:
+//    - Pour calculer le score, je me base sur la position réelle du dinosaure, car
+//      pour simplifier les calculs, j'ai décider de faire bouger le référentiel avec
+//      le dinosaure, ce qui veut dire que la réelle position du dinosaure est relative
+//      au sol, qui commence à x=0, et qui bouge en sens inverse par rapport au
+//      dinosaure, par conséquent Xdino = Xrel - Xcactus
+//                                Xdino = 0    - Xcactus
+//    - Le choix de ce calcul était certes attrayant, mais le score défilais trop vite,
+//      par conséquent j'ai décidé de réduire ce score en divisant par 20
+//      => j'ai choisi 20 un peu au hasard
+//
+//  TODO: Remplacer 20 par une constante globale
+//  TODO: Ajout de differentes methodes de score
 //
 ////////////////////////////////////////////////////////////////////////////////////////
 void calculeScore() {
-  /// TODO: Ajout de differentes methodes de score
+
+  /// Plus d'informations plus haut
   score = -solX / (20 * echelle.x);
+
   // Cette manière de voir les paliers s'était imposée d'elle-même car le jeu parfois
   /// "Sautait" des paliers (le score est flottant), donc il aurait fallu que j'en fasse
   /// un teste incluant un intervalle, mais ce faisant, le son sera déclenché
@@ -385,37 +543,110 @@ void calculeScore() {
 
 ////////////////////////////////////////////////////////////////////////////////////////
 //
-// teste la collision entre le dino et un cactus
+//  Teste la collision entre le dino et un cactus
+//  Elle prends pour paramètre:
+//    p: Un PVector contenant la position à vérifier
+//      pour choisir la position du dino, laisser vide
+//        ->voir fonctions ci-après 
+//
+//  Notes:
+//    - Les positions sont relatives au référentiels, et non à l'écran
+//      =>  Cela devrait être un peu plus rapide car les positions ne seront pas
+//          systématiquement converties en pixels
+//      =>  Chaque dessin sera d'autant plus lent que les positions seront
+//          systématiquement converties en pixels
+//    - Les cactus ne seront pris en compte que s'ils sont dans la partie "droite" du repère,
+//      c'est à dire sin nous ne l'avons pas encore dépassé, par conséquent cela n'aura pas
+//      beaucoups d'incidence vu que la vitesse sera toujours positive, et par conséquent 
+//      c'est en changant l'échelle de signe que l'on pourra le faire aller de droite à gauche
 //
 ////////////////////////////////////////////////////////////////////////////////////////
-boolean collision(float X, float Y) {/// Position du dino
+boolean collision(final PVector p) {
+  ///  Nous allons dessiner, donc je redéfinis certains paramères globaux au cas où ils
+  ///    auraient été modifiés en dehors de la fonction
   strokeWeight(1);
 
-  X = (echelle.x * X) + referentiel.x;
-  Y = (echelle.y * Y) + referentiel.y;
-  if (dShowHitBoxes) {
-    ellipse(X, Y, hitBoxRadius * 2, hitBoxRadius * 2);
+  ///  Comme je ne peux pas utiliser les dimesions en pixels, alors je convertis en sens inverse, 
+  ///    Mais uniquemet une fois par appel de fonction, cela reste moins qu'avant.
+  for (float[] i : dimensionsCactus) {
+    /// Nous mettons à jour les variables que nous allons utiliser,
+    ///  on peut voir les dimensions comme étant une liste du type
+    ///     [w, h, r, Ax, Ay, Bx, By]
+    for (int j = 0; j < 6; ++j) {
+      /// Nous prenons la valeur 7 cases avant et nous la converissons,
+      ///  selon x pour les cases paires et selon y pour les impaires
+      i[j + 7] = (i[j] / ((j % 2 == 0) ? echelle.x : echelle.y));
+    }
+
+    /// Si le plus grand diamètre est horisontal, ou vertical
+    i[13] = (i[0] > i[1]) ? (i[0] / echelle.x) : (i[1] / echelle.y);
   }
 
-  float y = referentiel.y;
-  /// Nous pouvons retourner la valeur en cas de choc ou attendre pour afficher toutes les hitbox
-  ///   boolean value;
 
-  /// TODO: Peut-être remplacé par des contantes;
-  float h = dinoImgs[0].height;
-  float w = dinoImgs[0].width;
-  float r = sqrt(pow(h / 2, 2) + pow(w / 2, 2));
+
+  ///  Pour calculer si une sphère (le presonnage) entre en collision avec une ellipse (le cactus),
+  ///    je dois vérifier si (d1 + d2) < rE + 2*rC
+  ///    du cactus, avec:
+  ///      d1:la distance entre le centre du cercle et le premier foyer de l'ellipse 
+  ///      d2:la distance entre le centre du cercle et le second foyer de l'ellipse 
+  ///      rC:le rayon du cercle
+  ///      rE:la distance egale à d1 + d2 our tout points de l'ellipse
+  ///    L'imprécision sera de l'ordre de abs(tan(alpha) - alpha), avec alpha
+  ///      l'angle AMB avec A et B les foyers et C le centre du cercle
+
+  if (dShowHitBoxes) {
+    /// Comme dit précédemment, nous calculons la localisation des points uniquement en temps voulu,
+    ///  sinon, nous utiliserons systématiquement des positions relatives au référentiel
+    ellipse(
+      (echelle.x * p.x) + repere.x, 
+      (echelle.y * p.y) + repere.y, 
+      hitBoxRadius * 2, hitBoxRadius * 2
+      );
+  }
+
+  ///  Nous pouvons retourner la valeur en cas de choc ou attendre pour afficher toutes les hitbox,
+  ///    ou nous pouvons utiliser deux boucles
+
+  /// Une première en cas d'affichage des hitboxes, ...
+  if (dShowHitBoxes) {
+    for (float[] i : cactuses) {
+      int type = (int) i[TYPE];
+      if (i[POS] > 0) {
+        ellipse(
+          (i[POS] * echelle.x) + repere.x, 
+          repere.y, 
+          dimensionsCactus[type][0], 
+          dimensionsCactus[type][1]
+          );
+      }
+    }
+  }
+
+
+
+
 
   for (float[] i : cactuses) {
-    /// TODO: Tester si cela est un bon test
-    if (i[TYPE] > -1 && (i[POS] + 50 > referentiel.x)) {
-      float x = (echelle.x * i[POS]) + referentiel.x;
-      if (dShowHitBoxes) {
-        /// TODO: Afficher le cercle dans une autre couleur
-        ellipse(x, y, h, w);
-      }
-      if (sqrt(pow(x - X, 2) + pow(y - Y, 2)) < (hitBoxRadius + r)) {
-        return true;
+    /// TODO: Creer une option por aussi prendre en compte l'autre côté
+    int type = (int) i[TYPE];
+    if (type > -1) {
+      float rE = dimensionsCactus[type][13];
+      float rC = hitBoxRadius;
+
+      if (i[POS] > p.x || i[POS] + rC + rE > p.x) {
+
+        float Ax = dimensionsCactus[type][7 + 2] + i[POS];
+        float Ay = dimensionsCactus[type][7 + 3];
+        float Bx = dimensionsCactus[type][7 + 4] + i[POS];
+        float By = dimensionsCactus[type][7 + 5];
+
+        float d1 = sqrt(pow(Ax - p.x, 2) + pow(Ay - p.y, 2));
+        float d2 = sqrt(pow(Bx - p.x, 2) + pow(By - p.y, 2));
+
+
+        if ((d1 + d2) < rE + 2*rC) {
+          return true;
+        }
       }
     }
   }
@@ -423,112 +654,52 @@ boolean collision(float X, float Y) {/// Position du dino
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
+//
+// Les "wrapper" de la fonction collision
+//
+////////////////////////////////////////////////////////////////////////////////////////
+
+///  Sans argument, on utilise la position actuelle:
+///    Nous passons la position en paramètre, 
+boolean collision() {
+  return collision(position);
+}
+
+///  Nous pourrons aussi lui donner des int ou des floats
+boolean collision(float x, float y) {
+  return collision(new PVector(x, y));
+}
+boolean collision(int x, int y) {
+  return collision(new PVector(x, y));
+}
+
+/// Ou encore une liste de positions
+boolean collision(int[] p) {
+  return collision(new PVector(p[0], p[1]));
+}
+boolean collision(float[] p) {
+  return collision(new PVector(p[0], p[1]));
+}
+
+
+////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Teste la collision entre le dino et un cactus, cette procédure ne servira que
+//    d'interface pour être facilement appelé dans la fonction draw
+//
+//  Elle ne prend aucun paramètre et ne retourne rien
+//
+////////////////////////////////////////////////////////////////////////////////////////
 void testeCollisions() {
-  boolean mustSlowDown = false;
   // Le décalage n'a pas d'importance
-  if (!dImmortal) {
-    if (collision(position.x, position.y)) {
-      gameOver = true;
-    }
+  if (collision(position) && !dImmortal) {
+    gameOver = true;
   }
-  dAutoSlowDown = mustSlowDown;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
 //
-// Outils de débogages
-//
-////////////////////////////////////////////////////////////////////////////////////////
-void debugTools() {
-  // TODO: Add pages
-
-  if (!debug) {
-    return;
-  }
-
-  if (dSpeedFollowsMouse) {
-    vitesse.x = mouseX;
-  } else if (dGravityFollowsMouse) {
-    jumpSpeed = 100 * vitesseSaut0 / mouseX;
-    g = 100 * g0 / mouseY;
-    /// TODO: Create a global 32
-  }
-  if (dSpeedSquared) {
-    vitesse.y = vitesse.x;
-  }
-  if (dRareteMouse) {
-    rarete = mouseY;
-  }
-
-  float y = TEXT_SIZE / 3, x = 0;
-
-  textAlign(TOP, LEFT);
-  textSize(TEXT_SIZE / 3);
-  fill(TEXT_COLOR, 255);
-
-  text("Position                      " + position.y, x, y);
-  y += TEXT_SIZE / 3;
-
-  text("Vitesse de saut               " + jumpSpeed, x, y);
-  y += TEXT_SIZE / 3;
-
-  text("Acceleration gravitationnelle " + g, x, y);
-  y += TEXT_SIZE / 3;
-
-  text("Vitessed de défilement        " + vitesse.x, x, y);
-  y += TEXT_SIZE / 3;
-
-  text("Vitessed verticale            " + vitesse.y, x, y);
-  y += TEXT_SIZE / 3;
-
-  /// Ligne vide
-  y += TEXT_SIZE / 3;
-
-  text("Temps entre deux frames       " + dT, x, y);
-  y += TEXT_SIZE / 3;
-
-  /// Ligne vide
-  y += TEXT_SIZE / 3;
-
-  text("Affichage des hit boxes       " + (dShowHitBoxes ? "ON" : "OFF"), x, y);
-  y += TEXT_SIZE / 3;
-
-  text("Rayon des hit boxes           " + hitBoxRadius, x, y);
-  y += TEXT_SIZE / 3;
-
-  text("Vous êtes                     " + (dImmortal ? "invincible" : "mortel"), x, y);
-  y += TEXT_SIZE / 3;
-
-  /// Ligne vide
-  y += TEXT_SIZE / 3;
-
-  text("Saut en cours                 " + (dJumping ? "OUI" : "NON"), x, y);
-  y += TEXT_SIZE / 3;
-
-  text("Atterissage lent              " + (dSlowLanding ? "ON" : "OFF"), x, y);
-  y += TEXT_SIZE / 3;
-  
-  text("Ralentissement actuel         " + dSlowDownRate, x, y);
-  y += TEXT_SIZE / 3;
-
-
-
-  /// Colonne du milieu
-  x = (width / 2) - 250;
-  y = TEXT_SIZE / 3;
-  textAlign(TOP, CENTER);
-
-  for (float[] i : cactuses) {
-    text("Cactus " + (i[TYPE] == SIMPLE ? "SIMPLE" : i[TYPE] == TRIPLE ? "TRIPLE" : "??????") + " " + i[POS], x, y);
-    y += TEXT_SIZE / 3;
-  }
-
-  text("Rareté des cactus             " + rarete, x, y);
-  y += TEXT_SIZE / 3;
-}
-////////////////////////////////////////////////////////////////////////////////////////
-//
-// calcule le mouvement du sol
+// calcule le mouvement du sol et accélère la vitesse horizontale
 //
 ////////////////////////////////////////////////////////////////////////////////////////
 void mouvementSol() {
@@ -544,17 +715,37 @@ void mouvementSol() {
 
 ////////////////////////////////////////////////////////////////////////////////////////
 //
+// Ajoute un nouveau cactus
+//
+////////////////////////////////////////////////////////////////////////////////////////
+void ajoutCactus() {
+  float[] cactus = cactuses[(int) random(0, cactuses.length)];
+  if (cactus[POS] < 0) {
+    cactus[TYPE] = (random(0, 50) < 25) ? SIMPLE : TRIPLE;
+    cactus[POS] = (int) (width * 1.1 / echelle.x);
+  } else {
+    for (float[]c : cactuses) {
+      if (c[POS] < 0) {
+        c[TYPE] = (random(0, 50) < 25) ? SIMPLE : TRIPLE;
+        c[POS] = (int) (width * 1.1 / echelle.x);
+        return;
+      }
+    }
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+//
 // calcule le mouvement des cactus
 //
 ////////////////////////////////////////////////////////////////////////////////////////
 void mouvementCactus() {
+  /// Rareté: à chaque rafraichissement: 1/rareté chace d'en avoir un nouveau
+  //// TODO: Améliorer cela, par exemple en l'auguementant avec le temps
   if (random(0, rarete) < 1) {
-    float[] cactus = cactuses[(int) random(0, cactuses.length)];
-    if (cactus[POS] < 0) {
-      cactus[TYPE] = random(0, 50) < 25 ? SIMPLE : TRIPLE;
-      cactus[POS] = (int) (width * 1.1 / echelle.x);
-    }
+    ajoutCactus();
   }
+  /// Bouger tous les cactus en même temps
   for (float[]i : cactuses) {
     i[POS] -= (vitesse.x * dT);
   }
@@ -562,7 +753,291 @@ void mouvementCactus() {
 
 ////////////////////////////////////////////////////////////////////////////////////////
 //
-// calcule le mouvement du dino
+// Focntion permettant de retourner la distace horizontale du cactus
+//    le plus proche du dinosaure
+//
+////////////////////////////////////////////////////////////////////////////////////////
+float distanceCactus() {
+  float d = 1000000, e;
+  for (float[]i : cactuses) {
+    if (i[POS] > -1) { 
+      e = i[POS] - (cactusImgs[(int) i[TYPE]].width / 2 * echelle.x);
+      if (e > 0 && e < d) {
+        d = e;
+      }
+    }
+  }
+  return d;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Sympatique fonction permettant de savoir si oui ou non le joueur va mourir
+//    ne fonctionne pas uniquement si le joueur saute, car elle ne fait que
+//    tester pour cela chacunes des positions qu'on lui donne et renvoie vrai
+//    dès qu'une position est "dangereuse", par conséquent plus cette dernière
+//    est proche du début de la liste, plus la fonction sera rapide
+//
+//  La fonction prends pour unique paramère une liste de positions, sous la forme d'une
+//    matrice de floats, de taille variable
+//
+// TODO: Ajouter une implémentation (activable ou désactivable) se servant uniquement
+//    de la fonction distanceCactus pour donner une approximation du résultat
+//
+////////////////////////////////////////////////////////////////////////////////////////
+boolean mortALHorizon(float[][] positions) {
+  int tombeDepuis = 0;
+  for (float[] position : positions) {
+    /// Si nous trouvons un quelconque y négatif, c'est que nous avons atteint la limite
+    ///  du tableau, dans ce cas, aucune positions ne s'est révélé dangereuse
+    tombeDepuis = (position[1] < 1) ? (tombeDepuis + 1) : 0;
+    if (position[1] < 0) {
+      return false;
+    } else if (tombeDepuis > tempsDeReaction) {
+      return false;
+    } else if (collision(position)) {
+      return true;
+    }
+  }
+  return false;
+}
+boolean mortALHorizon() {
+  return mortALHorizon(prochainesPositions());
+}
+////////////////////////////////////////////////////////////////////////////////////////
+//
+// Affiche des ellipses correspondant à des hitboxes aux positions données
+//
+////////////////////////////////////////////////////////////////////////////////////////
+void afficherHitBoxes(float[][] positions) {
+  /// TODO: Inutile de charger des cases mémoires en plus, donc retirer ces variables
+  ///        superflues
+  float x, y, _x, _y;
+  _x = positions[0][0];
+  _y = positions[0][1];
+  for (int i = 1; i < positions.length; ++i) {
+    /// Si nous trouvons un quelconque y négatif, c'est que nous avons atteint la limite
+    ///  du tableau, dans ce cas, aucune positions ne s'est révélé dangereuse
+    x = positions[i][0];
+    y = positions[i][1];
+    if (y < 0) {
+      return;
+    }
+    // positions[i] = {x, y}
+    //    if (dContinuousTrajectory) {
+    line((_x * echelle.x) + repere.x, (_y * echelle.y) + repere.y, 
+      (x * echelle.x) + repere.x, (y * echelle.y) + repere.y);
+    //  } else {
+    ellipse((x * echelle.x) + repere.x, 
+      (y * echelle.y) + repere.y, hitBoxRadius * 2, hitBoxRadius * 2);
+    //}
+    _x = x;
+    _y = y;
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Retourne un array de prochaines positions, au regard de:
+//    p: La position de départ
+//    v:  La vitesse de départ
+//    a:  L'accélération (suposée constante)
+//    t:  Le laps de temps qui s'écoule entre deux frames
+//  
+//  Cette fonction a pour but de simplifier les autres fonctions, en calculant les prochaines
+//    positions uniquement une fois par itération
+//
+//  Notes:
+//    - Les valeurs seront toujours, sauf indication contraire, dépendantes du repère
+//    - Le dinosaure ne peux pas tomber plus bas que le sol (0), par conséquent pour évier
+//      les itérations inutiles, la dernière case sera systématiquement de -1, un peu comme
+//      le '\0' à la fin des chaines de caractères en C
+//    - Les paramètres n'ont qu'une seule lettre, pour pouvoir les différencier des
+//      variables globales associées
+//    - Les paramètres sont des objets, donc vous pouvez les remplir avec null pour utiliser
+//      les valeurs globales associées, donner une valeur négative à t aura le même effet
+//    - La trajectoire ne sera pas exacte pour un bon nombre de facteurs, dont:
+//      * Les accélérations qui peuvent changer
+//      * dT, qui pourra aussi changer
+//
+//  TODO: Ajouter une variable globale associée à la taille limite de positions, qui
+//    pourra par exemple évoluer en fonction des performances de la machines, en la
+//    réduisant out l'auguementant si nécessaire, avec par exemple un PVector de type
+//      PVector(min, max, step, value)
+//
+//  TODO: Choisir entre double et float
+//
+////////////////////////////////////////////////////////////////////////////////////////
+float[][] prochainesPositions(PVector p, PVector v, PVector a, float t) {
+
+  println(p, v, a, t);
+  /// Comme dit plus haut: null => defaut
+  p = (p == null) ? position.copy()      : p;
+  v = (v == null) ? vitesse.copy()       : v;
+  a = (a == null) ? acceleration.copy()  : a;
+  t = t < 0       ? dT                   : t;
+
+  // Ceci évite les calculs inutiles, en réduisant le nombre de cases à lire
+  //  pour la fonction appelante, et en réduisant le nombre de calculs de collisions
+  int index = 0, tombeDepuis = 0;
+
+
+  /// TODO: Rendre cela global, et modifiable au regard des performances de la machine
+  final int nombrePoints = 100;
+
+
+  /// Valeur retournée
+  float[][] positions = new float[nombrePoints][2];
+
+
+  /// Cette limite est la limite à "droite", car en fonction de scale.x, la droite peux devenir la gauche
+  ///  Elle correspond au choix à la limite droite (width) ou à la limite gauche (0) en fonction de l'echelle
+  float limite = ((echelle.x > 0 ? width : 0) - repere.x) / echelle.x;
+  /// Nous allons commencer par savoir si nous sommes à gauche de la limite à droite, en effet franchir la 
+  ///    limite veux en réalité dire passer de gauche à droite ou inversement de droite à gauche
+  boolean aGauche = p.x < limite;
+
+
+  /// Nous commençons par la position actuelle, et nous allons donc commencer
+  ///  à écrire à la position 0 + 1, donc la position 1
+  positions[0][0] = p.x;
+  positions[0][1] = p.y;
+  index = 1;
+
+  ///  Boucler jusqu'à la fin, c'est à dire jusqu'à que nous atteignons le côté droit de l'écran
+  ///    quand les points sont trop raprochés, nous devrons les séparer
+  ///    pour cela, nous utiliserons les rayons, les cercles ne doivent pas se
+  ///    renter dedans
+  ///  On commence par incrémenter x, sinin le premier sera juste au dessus
+  ///    de la position actuelle
+  ///  Note: j'utilise xor, mais je pense que les opérations seraon plus ou moins les memes
+  ///    (A ^ B) == (A != B) dans le cas des booleens
+  for (p.x += v.x * t; (index < positions.length) && (aGauche ^ (p.x > limite)); p.x += v.x * t) {
+
+    /// Ceci n'est qu'une copie de ce que vous pouvez voir au début de cette fonction
+    p.y += v.y * t;
+    if (p.y < 0) {
+      p.y = 0;
+      v.y = 0;
+    } else if (p.y > 0) {
+      v.y -= acceleration.y * t;
+      /// Ceci est calculé quand la postion du sol est mise à jour
+      v.x += a.x * t;
+    } /// Si y = 0, nous ne faisons rien
+
+    /// Si nous sommes sur le sol pour un certain temps et que nous montons, alors
+    ///  nous ne sommes plus sur le sol, et nous sommes tombeDepuis 0
+    tombeDepuis = p.y < 1 ? tombeDepuis + 1 : 0;
+
+    /// Dans le cas où nous aurions touchés le sol, il nous faudra éloigner les points
+    /*if (tombeDepuis > tempsDeReaction) {
+     v.x += 2;
+     }*/
+
+    /// Ajout du couple de coordonnées à la liste
+    positions[index][0] = p.x;
+    positions[index][1] = p.y;
+
+    /// Incrémentation de l'indice
+    index++;
+  }
+  if (index < positions.length) {
+    positions[index][0] = -1;
+    positions[index][1] = -1;
+  }
+
+  return positions;
+}
+
+//  Fonction utilisée pour rendre le code plus lisible, en effet quand il n'y aura que
+//    deux paramètres, c'est à dire dans l'immense majorité des cas, je pourrais
+//    me permettre d'omettre les deux derniers paramètres, les valeur re retour étant
+//    des tableaux (pointeurs), le programme ne sera pas alourdi par de nombreuses
+//    copies, car les pointeurs sont rapides a transmettre (je pense).
+float[][] prochainesPositions(PVector p, PVector v) {
+  return prochainesPositions(p, v, null, -1);
+}
+float[][] prochainesPositions() {
+  return prochainesPositions(null, null, null, -1);
+}
+// Si nous voulons avoir la liste de positions en cas de saut
+float[][] prochainesPositions(boolean saut) {
+  if (saut) {
+    return prochainesPositions(
+      new PVector(position.x + tempsDeReaction, position.y), /// Position initiale
+      new PVector(vitesse.x, jumpSpeed)/// Vitesse initiale
+      );
+  }
+  return prochainesPositions();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Définit si oui ou non le joueur peut sauter et rester vivant
+//
+//    X, Y: Comme toujours, les positions X et Y seront les positions dans le référentiel,
+//          et comme toujours il sera plus rapide de calculer cela en omettant l'affichage
+//          des hitboxes, car cela nous permettra de ne pas changer de référentiel, en
+//          effet les coordonnées du référentiel vont systématiquement être modifiées
+//          pour pouvoir être affiché car elles sont systématiquement stiquées en
+//          fonction du référentiel
+//
+//    showBoxes: Ceci est important, car comme dit précédemment ce sera coûteux de le faire,
+//                TODO: lui donner l'utilité qu'il mérite
+//
+////////////////////////////////////////////////////////////////////////////////////////
+
+boolean peutSauter(float X, float Y, boolean showBoxes) {
+
+  /// Je préfère sauvegarder cette valeur, au cas ou cette variable vienais à changer
+  ///  car nous serons obligés de la modifier pour n'afficher qu'une fois les hitboxes
+  ///  actuelles
+  /// TODO: Gérer les éventuels effets de bords que peuvent avoir cette ligne, car la
+  ///    variable est suceptible de changer entre temps, si c'est le cas, par exemple si
+  ///    l'utilisateur relache la touche associée, alors le programme la gardera active
+  boolean showHitBoxes = dShowHitBoxes;
+
+
+
+
+  /// On prends les prochaines positions à partir de la position X, Y, et d'un
+  ///    hypothétique saut et on les donne unes par unes à collision pour voir
+  float[][] positions = prochainesPositions(true);
+
+
+
+  /// TODO: N'afficher que les points en l'air
+  /// TODO: Creer une fonction retournant uniquement les cactus visibles
+
+  /// Si nous sommes au sol, alors nous aurons une prédiction hypotétique
+  //fill((position.y < 10 ? #00ff00 : #0000ff), 255);
+  /// TODO:Combiner ce facteur avec le facteur collision
+
+  /// TODO: Faire le point sur quelles fonctions peuvent et quelles fonctions ne peuvent pas ecrire
+
+  /// Nous ne voulons pas que les box soit affichées encore et encore
+  boolean show = dShowHitBoxes;
+  dShowHitBoxes = false;
+
+  boolean vaMourir = mortALHorizon(positions);
+
+  /// Rouge si nous allons toucher, vert sinon
+  /// TODO: Est-ce que cela va causer des erreurs?
+  fill(vaMourir ? #ff0000 : #00ff00, 64);
+
+  dShowHitBoxes = show;
+
+  if (dShowHitBoxes) {
+    afficherHitBoxes(positions);
+  }
+
+  return !vaMourir;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+//
+// calcule le mouvement du dino, et affiche la trajectoire (rouge ou verte en fonction
+//  de la dangerosité du chemin
 //
 ////////////////////////////////////////////////////////////////////////////////////////
 void mouvementDino() {
@@ -573,119 +1048,39 @@ void mouvementDino() {
     vitesse.y = 0;
     dJumping = false;
   } else if (position.y > 0) {
-    vitesse.y -= g * dT;
+    vitesse.y -= acceleration.y * dT;
   }
 
-  // On fera des dessins plus bas
-  strokeWeight(1);
-
-  /// Prédit les prochains emplacements,  pour cela, nous devrons connaitre les conditions initiales
-  ///  sans pour autant modifier les variables, et pour faire des lignes, il faut deux points
-  float x, y, _x, _y, vX, vY;
-
-  // Si nous sommes en plein saut, alors prendre la vitesse verticale actuelle, sinon prendre la vitesse de saut
-  vY = position.y < 1 ? jumpSpeed : vitesse.y; /// TODO: Ajout d'une constante pour toutes les incertitudes
-
-  /// XXX Nous devrons donc éviter de modifier la maniere dont la vitesse change
-  //    de plus, les changements de dT pourront avoir un impact sur la justesse de
-  //    la trajectoire ainsi calculée
-  // Nous prenons les conditions initiales sur x, y et 
-  vX = vitesse.x;
-  x = _x = position.x;
-  y = _y = position.y;
-
-  /// TODO: Changer la couleur en rouge si nous touchons un cactus, pour cela:
-  ///    faire une boucle pour chaque cactus visible
-  ///    pour chaque cactus: calculer y(x) = (yPredicted) if y < end
-
-  /// TODO: N'afficher que les points en l'air
-
-  /// TODO: Pilote automatique
-
-  /// TODO: Creer une fonction retournant uniquement les cactus visibles
-
-  /// Si nous sommes au sol, alors nous aurons une prédiction hypotétique
-  //fill((position.y < 10 ? #00ff00 : #0000ff), 255);
-  /// TODO:Combiner ce facteur avec le facteur collision
-
-  /// TODO: Changer l'algo, ne pas afficher en temps réel, mais stocker dans un array
-
-  float[][] positions = new float[1000][2];
-  println(positions.length + " positions");
-  // Ceci évite les calculs inutiles
-  int index = 0, tombeDepuis = 0;
-  /// On considere que l'utilisateur ne 
-  final int tempsDeReaction = 3;
-
-  ///  Boucler jusqu'à la fin, c'est à dire jusqu'à que nous atteignons le sol
-  ///    quand les points sont trop raprochés, nous devrons les séparer
-  ///    pour cela, nous utiliserons les rayons, les cercles ne doivent pas se
-  ///    renter dedans
-  ///  On commence par incrémenter x, sinin le premier sera juste au dessus
-  ///    de la position actuelle
-  for (x += vitesse.x * dT; x < width / echelle.x && (index < positions.length); x += vitesse.x * dT) {
-
-    /// Ceci n'est qu'une copie de ce que vous pouvez voir au début de cette fonction
-    y += vY * dT;
-    if (y < 0) {
-      y = 0;
-      vY = 0;
-    } else if (y > 0) {
-      vY -= g * dT;
-      /// Ceci est calculé quand la postion du sol est mise à jour
-      vX += acceleration.x * dT;
-    } 
-    if(tombeDepuis > tempsDeReaction) {
-      vX *= 2;
+  if (dJumping) {
+    if (mortALHorizon()) {
+      text("DIE", width / 2, height / 2);
     }
-    
-    /// Ajout du couple de coordonnées à la liste
-    positions[index][0] = x;
-    positions[index][1] = y;
-    
-    
-    println(tombeDepuis);
-    tombeDepuis = y < 1 ? tombeDepuis + 1 : 0;
+  } else {
 
-    index++;
-  }
+    /// On calcule toutes les positions en partant du principe
+    ///  que nous commencions à sauter maintenant
+    float[][] positions = prochainesPositions(true);
 
-  boolean willCollide = false;
-  tombeDepuis = 0;
-  /// Nous ne voulons pas que les box soit affichées encore et encore
-  boolean show = dShowHitBoxes;
-  dShowHitBoxes = false;
-
-  /// Si nous savons que cela ne va pas psser, nous n'avos pas à recalculer
-  // On itere de 0 à len - 2 car on va utiliser i + 1
-  for (int i = 0; i < index && !willCollide && tombeDepuis < tempsDeReaction; ++i) {
-    // positions[i] = {x, y}
-    tombeDepuis = positions[i][1] < 1 ? tombeDepuis + 1 : 0;
-    willCollide = collision(positions[i][0], positions[i][1]);
-  }
-
-  dShowHitBoxes = show;
-
-  /// Rouge si nous allons toucher, vert sinon
-  fill(willCollide ? #ff0000 : #00ff00, 64);
-  println("Will" + (willCollide ? " " : " not ") + "collide");
-  // TODO: Réparer les effets de bords causés par cette ligne
-
-  // On itere de 0 à len - 2 car on va utiliser i + 1
-  for (int i = 0; i + 1 < index; ++i) {
-    // positions[i] = {x, y}
-    /// TODO: Inutile de charger des cases en plus
-    x = positions[i][0];
-    y = positions[i][1];
-    _x = positions[i + 1][0];
-    _y = positions[i + 1][1];
-//    if (dContinuousTrajectory) {
-      line((_x * echelle.x) + referentiel.x, (_y * echelle.y) + referentiel.y, 
-        (x * echelle.x) + referentiel.x, (y * echelle.y) + referentiel.y);
-  //  } else {
-      ellipse((x * echelle.x) + referentiel.x, 
-        (y * echelle.y) + referentiel.y, hitBoxRadius * 2, hitBoxRadius * 2);
-    //}
+    /// On recherche le point le plus haut, et on en déduit xMax, 
+    ///  abscisse pour laquelle le dino est le plus loin du sol
+    float _max = 0, xMax;
+    int maxIndex = 0;
+    for (int i = 0; i < positions.length; ++i) {
+      if (_max < positions[i][1]) {
+        _max = positions[i][1];
+        maxIndex = i;
+      }
+    }
+    xMax = positions[maxIndex][0];
+    ellipse(xMax * echelle.x + repere.x, _max * echelle.y + repere.y, 50, 50);
+    afficherHitBoxes(positions);
+    if (peutSauter(position.x, position.y, true)) {
+      text("JUMP " + distanceCactus() + " " + _max + " " + maxIndex, width / 2, height / 2);
+      if (distanceCactus() < xMax) {
+        vitesse.y = jumpSpeed;
+        dJumping = true;
+      }
+    }
   }
 }
 
@@ -745,17 +1140,17 @@ void afficheSprites() {
   /// La position de la premiere dépend de l'echelle, mais les autres ne seront que
   ///  des répétitions, avec un decalage fixe
   for (float x = solX * echelle.x % 600; x < width + 600; x += 600) {
-    image(solImg, x + referentiel.x, referentiel.y + 25);
+    image(solImg, x + repere.x, repere.y + 25);
   }
 
   // Affiche le dino TODO: Faire mieux
   image(dinoImgs[position.y < 10 ? (int) (frameCount * 3 / frameRate) % 2 : gameOver ? DEATH_PIC : JUMP_PIC], 
-    (position.x * echelle.x) + referentiel.x, (position.y * echelle.y) + referentiel.y);
+    (position.x * echelle.x) + repere.x, (position.y * echelle.y) + repere.y);
 
   for (float[] i : cactuses) {
-    if (i[TYPE] > -1 && i[POS] > - referentiel.x - 50) {
+    if (i[TYPE] > -1 && i[POS] > - repere.x - 50) {
       ///reference.x: ordonnée du 0
-      image(cactusImgs[(int) i[TYPE]], (echelle.x * i[POS]) + referentiel.x, referentiel.y);
+      image(cactusImgs[(int) i[TYPE]], (echelle.x * i[POS]) + repere.x, repere.y);
     }
   }
 }
@@ -767,6 +1162,7 @@ void afficheSprites() {
 //
 ////////////////////////////////////////////////////////////////////////////////////////
 void keyPressed() {
+  /// TODO: Savoir si c'est une touche après l'autre ou pas
   if ((key == ' ') && gameOver) {
     println("ici");
     initJeu();
@@ -790,6 +1186,12 @@ void keyPressed() {
         dImmortal = !dImmortal;
       } else if (command.equals("debug")) {
         debug = !debug;
+      } else if (command.equals("slowlanding")) {
+        dSlowLanding = !dSlowLanding;
+      } else if (command.equals("helpmeee")) {
+        dHelp = !dHelp;
+      } else if (command.equals("viensamoi")) {
+        dPoursuite = !dPoursuite;
       }
     }
   } else if (key == '²') {
@@ -817,9 +1219,30 @@ void keyPressed() {
       case 'p':
         dPrediction = !dPrediction;
         break;
+      default:
+        switch(key) {
+        case '+':
+          ajoutCactus();
+        }
       }
     }
   }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
+//
+// - Change l'acceleration gravitationelle pour pouvoir avoir un saut de y mètres
+// - redémarre le jeu quand on appuie sur la barre d'espace
+//
+////////////////////////////////////////////////////////////////////////////////////////
+void reglerHauteurSaut(float y) {
+  acceleration.y = y * 10;
+  y = (y * echelle.y) + repere.y;
+  line(0, y, width, y);
+}
+/// Utilise l'ordonnée de la souris
+void reglerHauteurSaut() {
+  reglerHauteurSaut((mouseY - repere.y) / echelle.y);
 }
 
 void keyReleased() {
@@ -830,10 +1253,224 @@ void keyReleased() {
 }
 
 void mouseDragged() {
+  reglerHauteurSaut();
 }
 
 void mousePressed() {
 }
 
 void mouseReleased() {
+}
+////////////////////////////////////////////////////////////////////////////////////////
+//
+// Outils de débogages
+//
+////////////////////////////////////////////////////////////////////////////////////////
+void debugTools() {
+  // TODO: Add pages
+
+  if (!debug) {
+    return;
+  }
+
+  if (dSpeedFollowsMouse) {
+    vitesse.x = mouseX;
+  } else if (dGravityFollowsMouse) {
+    jumpSpeed = 100 * vitesseSaut0 / mouseX;
+    acceleration.y = 100 * g0 / mouseY;
+    /// TODO: Create a global 32
+  }
+  if (dSpeedSquared) {
+    vitesse.y = vitesse.x;
+  }
+  if (dRareteMouse) {
+    rarete = mouseY;
+  }
+
+  float y = TEXT_SIZE / 3, x = 0;
+
+  textAlign(TOP, LEFT);
+  textSize(TEXT_SIZE / 3);
+  fill(TEXT_COLOR, 255);
+
+  text("Echelle horizontale           " + echelle.x, x, y);
+  y += TEXT_SIZE / 3;
+
+  text("Echelle verticale             " + echelle.y, x, y);
+  y += TEXT_SIZE / 3;
+
+  /// Ligne vide
+  y += TEXT_SIZE / 3;
+
+  text("Position                      " + position.y, x, y);
+  y += TEXT_SIZE / 3;
+
+  text("Vitesse de saut               " + jumpSpeed, x, y);
+  y += TEXT_SIZE / 3;
+
+  text("Acceleration gravitationnelle " + acceleration.y, x, y);
+  y += TEXT_SIZE / 3;
+
+  text("Vitessed de défilement        " + vitesse.x, x, y);
+  y += TEXT_SIZE / 3;
+
+  text("Vitessed verticale            " + vitesse.y, x, y);
+  y += TEXT_SIZE / 3;
+
+  /// Ligne vide
+  y += TEXT_SIZE / 3;
+
+  text("Temps entre deux frames       " + dT, x, y);
+  y += TEXT_SIZE / 3;
+
+  /// Ligne vide
+  y += TEXT_SIZE / 3;
+
+  text("Affichage des hit boxes       " + (dShowHitBoxes ? "ON" : "OFF"), x, y);
+  y += TEXT_SIZE / 3;
+
+  text("Rayon des hit boxes           " + hitBoxRadius, x, y);
+  y += TEXT_SIZE / 3;
+
+  text("Vous êtes                     " + (dImmortal ? "invincible" : "mortel"), x, y);
+  y += TEXT_SIZE / 3;
+
+  /// Ligne vide
+  y += TEXT_SIZE / 3;
+
+  text("Saut en cours                 " + (dJumping ? "OUI" : "NON"), x, y);
+  y += TEXT_SIZE / 3;
+
+  text("Atterissage lent              " + (dSlowLanding ? "ON" : "OFF"), x, y);
+  y += TEXT_SIZE / 3;
+
+  text("Aide                          " + (dHelp ? "ON" : "OFF"), x, y);
+  y += TEXT_SIZE / 3;
+
+  text("Ralentissement actuel         " + dSlowDownRate, x, y);
+  y += TEXT_SIZE / 3;
+
+
+
+  /// Colonne du milieu
+  x = (width / 2) - 250;
+  y = TEXT_SIZE / 3;
+  textAlign(TOP, CENTER);
+
+  for (float[] i : cactuses) {
+    text("Cactus " + (i[TYPE] == SIMPLE ? "SIMPLE" : i[TYPE] == TRIPLE ? "TRIPLE" : "??????") + " " + i[POS], x, y);
+    y += TEXT_SIZE / 3;
+  }
+
+  text("Rareté des cactus             " + rarete, x, y);
+  y += TEXT_SIZE / 3;
+}
+
+/// x(t) = vx*t
+/// y(t) = vy*t - g*t²
+////
+/// tLim = vx / largeur
+
+/// yIdeal(tLim) = vy*tLim - gIdeal*tLim²
+/// yActuel(tLim)= vy*tLim - gActuel*tLim²
+
+/// gIdeal = (vy / tLim) - (yIdeal / tLim²)
+
+/// On vherche à faire des prévisions à la seconde, car à t = 1, t² = t
+
+float difference(final float[][] l, final PVector p) {
+  int index = -1;
+  for (int i = 0; i < l.length && index < 0; ++i) {
+    if (l[i][0] > p.x) {
+      index = i;
+    }
+  }
+  float y = (l[index][1] + l[index - 1][1]) / 2;
+  return (p.y - y);
+}
+
+void poursuite() {
+  if (!dPoursuite) {
+    jumpSpeed = vitesseSaut0;
+    acceleration.y = g0;
+    return;
+  }
+  /// Le dino ne pourra voler que s'il saute
+  if (!dJumping) {
+    jumpSpeed = 10;
+    acceleration.y = 0;
+    jump();
+  } else {
+
+    /// Calculer d'emblée le point du repère visé par la souris
+    PVector target = new PVector(
+      (mouseX - repere.x) / echelle.x, 
+      (mouseY - repere.y) / echelle.y
+      );
+
+    /// Prédire les prochaines positions si l'on fait rien
+    float[][] predictions = prochainesPositions();
+
+    ///  Finalement, au lieu de chercher une formule générique
+    ///    et par manque de temps, j'ai décidé de modifier
+    ///    l'accélération gravitationelle de manière lente,
+    ///    et de trouver le point le plus proche de la solution
+    ///    en faisant une moyenne de ce que j'ai trouvé, en effet
+    ///    si le pas est assez grand et le nombre d'itérations l'est
+    ///    aussi, de devrais avoir ~50% des prévisions en dessous de
+    ///    la cible, ~50% au dessus, donc en faisant la moyenne de
+    ///    tous, j'obtiendrai une valeur correcte (au moin
+    ///    approximativement correcte) 
+    float accelerationSum = 0;
+
+    ///  Cette variable est utile pour savoir s'il faut monter ou
+    ///    descendre, en effet s'il faut monter, je vais volontirement
+    ///    restreindre l'accélération verticale pour qu'elle soit
+    ///    positive, même si c'est pour aller trop haut (c'est le
+    ///    but d'avoir un petit effet de vague dans le déplacement
+    ///    vertical du dinosaure)
+    boolean under = difference(predictions, target) * 1.5 > 0;
+
+    ///  De plus, nous allons sauvegarder cette vatiable pour pouvoir
+    ///    réajuster le pas, et ainsi demander moins d'itérations pour
+    ///    le même résultat
+    float diff = difference(predictions, target);
+
+    boolean dinoUnder = position.y < target.y;
+
+    ///  Comme dit plus haut, le nombre d'itérations est important pour
+    ///    compenser l'absence d'une formule exacte
+    for (int l = 0; l < 1000; ++l) {
+
+      predictions = prochainesPositions();
+      under = difference(predictions, target) > 0;
+      // On établis un intervalle sur x, par rapport au x de la souris
+
+      text(under ? "DOWN" : "UP", width / 2, height / 2);
+
+      acceleration.y += (under ? -1 : 1) * log(abs(diff) + 1);
+
+      accelerationSum += acceleration.y;
+      /// acceleration.y *= vitesse.y - vPredict > 0 ? -1 : 1;
+      /// acceleration.y -= -(y - target.y) * 2 / target.x * target.x;
+      /// V(t+1) = V(t) + v - g
+      ///-V(t+1) + V(t) + v = g
+      /// a = V0 + dT - Vn+1
+    }
+    acceleration.y = (accelerationSum * 2 / 500);
+    fill(#ff0000);
+    afficherHitBoxes(prochainesPositions());
+    fill(64);
+  }
+  ///  Petit bout de rustine démonstrant par sa seul présence la
+  ///    fragilité de la solution, en effet, nous ne faisons que
+  ///    modifier g (acceleration.y), et par conséquent nous ne
+  ///    pouvons donc pas executer cette fonction si la souris
+  ///    est trop proche du dinosaure, ce qui aurait pour effet
+  ///    de chander la gravité pour des valeurs démesurées, voire
+  ///    INF.
+}
+void jump() {
+  dJumping = true;
+  vitesse.y = jumpSpeed;
 }
