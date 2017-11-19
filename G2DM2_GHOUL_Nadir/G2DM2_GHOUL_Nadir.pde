@@ -601,8 +601,8 @@ boolean collision(final PVector p) {
     /// Comme dit précédemment, nous calculons la localisation des points uniquement en temps voulu,
     ///  sinon, nous utiliserons systématiquement des positions relatives au référentiel
     ellipse(
-      (echelle.x * p.x) + repere.x,
-      (echelle.y * p.y) + repere.y,
+      (echelle.x * p.x) + repere.x, 
+      (echelle.y * p.y) + repere.y, 
       hitBoxRadius * 2, hitBoxRadius * 2
       );
   }
@@ -616,9 +616,9 @@ boolean collision(final PVector p) {
       int type = (int) i[TYPE];
       if (i[POS] > 0) {
         ellipse(
-          (i[POS] * echelle.x) + repere.x,
-          repere.y,
-          dimensionsCactus[type][0],
+          (i[POS] * echelle.x) + repere.x, 
+          repere.y, 
+          dimensionsCactus[type][0], 
           dimensionsCactus[type][1]
           );
       }
@@ -813,13 +813,13 @@ boolean mortALHorizon() {
 // Affiche des ellipses correspondant à des hitboxes aux positions données
 //
 ////////////////////////////////////////////////////////////////////////////////////////
-void afficherHitBoxes(float[][] positions) {
+void afficherHitBoxes(float[][] positions, int step) {
   /// TODO: Inutile de charger des cases mémoires en plus, donc retirer ces variables
   ///        superflues
   float x, y, _x, _y;
   _x = positions[0][0];
   _y = positions[0][1];
-  for (int i = 1; i < positions.length; ++i) {
+  for (int i = 1; i < positions.length; i += step) {
     /// Si nous trouvons un quelconque y négatif, c'est que nous avons atteint la limite
     ///  du tableau, dans ce cas, aucune positions ne s'est révélé dangereuse
     x = positions[i][0];
@@ -829,17 +829,19 @@ void afficherHitBoxes(float[][] positions) {
     }
     // positions[i] = {x, y}
     //    if (dContinuousTrajectory) {
-    line((_x * echelle.x) + repere.x, (_y * echelle.y) + repere.y,
+    line((_x * echelle.x) + repere.x, (_y * echelle.y) + repere.y, 
       (x * echelle.x) + repere.x, (y * echelle.y) + repere.y);
     //  } else {
-    ellipse((x * echelle.x) + repere.x,
+    ellipse((x * echelle.x) + repere.x, 
       (y * echelle.y) + repere.y, hitBoxRadius * 2, hitBoxRadius * 2);
     //}
     _x = x;
     _y = y;
   }
 }
-
+void afficherHitBoxes(float[][] positions) {
+  afficherHitBoxes(positions, 1);
+}
 ////////////////////////////////////////////////////////////////////////////////////////
 //
 //  Retourne un array de prochaines positions, au regard de:
@@ -1148,7 +1150,7 @@ void afficheSprites() {
   }
 
   // Affiche le dino TODO: Faire mieux
-  image(dinoImgs[position.y < 10 ? (int) (frameCount * 3 / frameRate) % 2 : gameOver ? DEATH_PIC : JUMP_PIC],
+  image(dinoImgs[position.y < 10 ? (int) (frameCount * 3 / frameRate) % 2 : gameOver ? DEATH_PIC : JUMP_PIC], 
     (position.x * echelle.x) + repere.x, (position.y * echelle.y) + repere.y);
 
   for (float[] i : cactuses) {
@@ -1205,7 +1207,7 @@ void keyPressed() {
         dPoursuite = !dPoursuite;
       } else if (command.equals("reset")) {
         initJeu();
-      }else if (command.equals("restart")) {
+      } else if (command.equals("restart")) {
         setup();
       }
     }
@@ -1362,7 +1364,7 @@ void debugTools() {
 
   text("Aide                          " + (dHelp ? "ON" : "OFF"), x, y);
   y += TEXT_SIZE / 3;
-  
+
   text("Poursuite                     " + (dPoursuite ? "ON" : "OFF"), x, y);
   y += TEXT_SIZE / 3;
 
@@ -1423,7 +1425,7 @@ void poursuite() {
 
     /// Calculer d'emblée le point du repère visé par la souris
     PVector target = new PVector(
-      (mouseX - repere.x) / echelle.x,
+      (mouseX - repere.x) / echelle.x, 
       (mouseY - repere.y) / echelle.y
       );
 
@@ -1459,7 +1461,7 @@ void poursuite() {
 
     ///  Comme dit plus haut, le nombre d'itérations est important pour
     ///    compenser l'absence d'une formule exacte
-    for (int l = 0; l < 1000; ++l) {
+    for (int l = 0; l < 20; ++l) {
 
       predictions = prochainesPositions();
       under = difference(predictions, target) > 0;
@@ -1467,7 +1469,81 @@ void poursuite() {
 
       text(under ? "DOWN" : "UP", width / 2, height / 2);
 
-      acceleration.y += (under ? -1 : 1) * log(abs(diff) + 1);
+      ///  Petit bout de rustine démonstrant par sa seul présence la
+      ///    fragilité de la solution, en effet, nous ne faisons que
+      ///    modifier g (acceleration.y), et par conséquent nous ne
+      ///    pouvons donc pas executer cette fonction si la souris
+      ///    est trop proche du dinosaure, ce qui aurait pour effet
+      ///    de chander la gravité pour des valeurs démesurées, voire
+      ///    INF.
+      ///  Ce booléen servira à savoir si nous dépassons de l'écran, pour
+      ///    savoir cela, nous allons calculer la différence entre le
+      ///    point maximal autorisé et le plus haut point de la trajectoire,
+      ///    en effet nous fairons un sorte de triangle ayant pour hypoténuse
+      ///    le segment PdinoPcurseur, et nous utiliserons le théorème de
+      ///    thalès pour s'assurer que tout les points de la trajectoire seront
+      ///    sous la droite correspondant à l'hypoténuse précedemment définie.
+      ///    x/y = X/Y => x = X*y/Y => y = x*Y/X
+      ///    Nous devons denc nous assurer que y soit plus petit que ça
+      ///  De plus, on ne va pas chercher à savoir ce qui adviendra après avoir
+      ///    dépassé le curseur
+      boolean depasse = false;
+      stroke(color(random(255), random(255), random(255)));
+      for (float[]i : predictions) {
+        if (i[0] < target.x) {
+          /// Différence des x pour la cible (Target) et pour la prediction (P)
+          float dxP = i[0] - position.x;
+          float dxT = target.x - position.x;
+
+          float dyP = i[1] - position.y;
+          float dyT = target.y - position.y;
+
+          /// Nous allons dans un premier temps calculer cela
+          boolean auDessusHyp = dyP > ((dxP * dyT) / dxT);
+
+          /// Pour en déduire cela
+          boolean dansTriangle = !under ? auDessusHyp : !auDessusHyp;
+
+          if (!dansTriangle) {
+            depasse = true;
+          } else {
+            afficherHitBoxes(prochainesPositions(), 20);
+          }
+        }
+      }
+      stroke(0);
+      ///  Vu que nous ne modifions que l'accélération, il se peut qu'il soit
+      ///    imporrible de viser le curseur sans dépasser de l'écran
+      ///    dans ce cas, on s'assure au moins d'avoir essayé 
+      for (int k = 0; k < 50 && depasse; ++k) {
+        acceleration.y += 1;
+        depasse = false;
+        stroke(color(random(255), random(255), random(255)));
+        for (float[]i : predictions) {
+          if (i[0] < target.x) {
+            /// Différence des x pour la cible (Target) et pour la prediction (P)
+            float dxP = i[0] - position.x;
+            float dxT = target.x - position.x;
+
+            float dyP = i[1] - position.y;
+            float dyT = target.y - position.y;
+
+            /// Nous allons dans un premier temps calculer cela
+            boolean auDessusHyp = dyP > ((dxP * dyT) / dxT);
+
+            /// Pour en déduire cela
+            boolean dansTriangle = !under ? auDessusHyp : !auDessusHyp;
+
+
+            if (!dansTriangle) {
+              depasse = true;
+            }
+          }
+        }
+      }
+      if (!depasse) {
+        acceleration.y += (under ? -1 : 1) * log(abs(diff) + 1);
+      }
 
       accelerationSum += acceleration.y;
       /// acceleration.y *= vitesse.y - vPredict > 0 ? -1 : 1;
@@ -1476,18 +1552,11 @@ void poursuite() {
       ///-V(t+1) + V(t) + v = g
       /// a = V0 + dT - Vn+1
     }
-    acceleration.y = (accelerationSum * 2 / 500);
+    acceleration.y = (accelerationSum / 500);
     fill(#ff0000);
     afficherHitBoxes(prochainesPositions());
     fill(64);
   }
-  ///  Petit bout de rustine démonstrant par sa seul présence la
-  ///    fragilité de la solution, en effet, nous ne faisons que
-  ///    modifier g (acceleration.y), et par conséquent nous ne
-  ///    pouvons donc pas executer cette fonction si la souris
-  ///    est trop proche du dinosaure, ce qui aurait pour effet
-  ///    de chander la gravité pour des valeurs démesurées, voire
-  ///    INF.
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -1512,7 +1581,7 @@ void jump(boolean verification) {
   ///    vitesse.add(saut);
   ///  Fais une vérification simple, en effet si nous ne voulons pas vérifier,
   ///    sauter, sinon s'assurer que noue pouvons
-  if(!verification || !dJumping) {
+  if (!verification || !dJumping) {
     jump();
   }
 }
