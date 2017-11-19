@@ -105,14 +105,17 @@ final int JUMP_SOUND = 0, DEATH_SOUND = 1, CENT_SOUND = 2;
 // les variables associées aux sprites
 //
 ////////////////////////////////////////////////////////////////////////////////////////
-// le niveau du sol, le zoom, la vitesse
-PVector referentiel, echelle, vitesse, position, acceleration;
+/// le niveau du sol, le zoom, la vitesse
+///  Importante note: les distances utilisées seront des "mètres", une unitée arbitraire
+///    servant à simplifier les calculs, en effet il sera plus simple de calculer comme
+///    s'il y avait une pesanteur qui nous tire vers le bas par exemple
+PVector repere, echelle, vitesse, position, acceleration;
 
 /// La vitesse initiale du saut et la force de pesanteur
 //final float g0 = 9.81, vitesseSaut0 = 98.1;
 final float g0 = 2500, vitesseSaut0 = 850, vX0 = 125;
 
-float jumpSpeed, g;
+float jumpSpeed;
 
 
 /// L'unique ordonnée du sol: à parir de celle-ci, on pourra trouver les autres, cela
@@ -213,7 +216,7 @@ void setup() {
   // SOUND ERROR: sounds[DEATH_SOUND] = new SoundFile(this, "boom.mp3");
   // SOUND ERROR: sounds[CENT_SOUND] = new SoundFile(this, "cent.mp3");
 
-  acceleration = new PVector(2, g);
+  acceleration = new PVector(2, g0);
 
 
   /// Les variables de débogage
@@ -246,7 +249,7 @@ void setup() {
 
   /// La vitesse initiale de saut: 
   jumpSpeed = vitesseSaut0;
-  g = g0;
+
 
   initJeu();
   gameOver = true;
@@ -259,7 +262,7 @@ void setup() {
 ////////////////////////////////////////////////////////////////////////////////////////
 void initJeu() {
   // la hauteur du sol
-  referentiel = new PVector(50, (height * 3 / 4));
+  repere = new PVector(50, (height * 3 / 4));
   echelle = new PVector(2, -1);
 
   // La vitesse de défilement sera rattaché au perso
