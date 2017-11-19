@@ -3,6 +3,62 @@
 //
 // SOUND ERROR: import processing.sound.*;
 
+/// TODO: rendre dJumping plus "large", pour parmettre un saut avans d'avoir touché le sol
+
+////////////////////////////////////////////////////////////////////////////////////////
+/// RESUME DES COMMANDES DE DEBUG: Dans le jeu, vous avez la possibilité d'activer/de
+///    désactiver des commandes de debug, en appuyant sur '²', une commande apparaitra
+///    en fin de page, (note: elle ne prends que des lettres, et laisse passer tout le
+///    reste, comme la barre d'espace par exemple)
+///
+///  Note: les commandes sont insensibles à la cases, donc "DeBug" <=> "debug" <=> "DEBUG"
+///
+///
+///  DEBUG:      Affiche/cache le menu de débug, et permet par la même occasion d'activer ou
+///                  désactiver les racourcis clavier. ATTENTION: Lorsque la barre de commande est
+///                  affichée, il est impossible d'utiliser les racourcis, les lettres étant captés
+///                  par la ligne de commande, il vous faut donc pour cela appuyer sur '²'. 
+///          
+///                  Les raccourcis sont:
+///                    g:L'accélération gravitationelle et la vitesse vertivale suivront
+///                      respectivelent l'ordonnée et l'abscicce de la souris
+///                    m:La vitesse de défilement horisontale suivra l'absice de la souris
+///                    r:Regle la rareté des cactus, plu elle est haute, plus il y en aura
+///                      TODO: pour l'instant, y=0 fais crasher le programme
+///                    +:Ajoute un cactus à droite
+///
+///  IMMORTAL:       Alias de INVINCIBLE
+///                  
+///  INVINCIBLE:     Le dinosaure est désormais invincible, rien ne peux le tuer, ni les
+///                  cactus, ni les météorites, il est immortel
+///                  
+///  HELPMEEE:       Le dinosaure deviens autonome
+///                  TODO:Limiter le nombre d'aides 
+///
+///  SLOWLANDING:    Le temps ralentira à chaque aterissage, utile si les cactus sont trop
+///                  sérrés a votre goût
+///
+///  VIENSAMOI:      Le dinosaure suivra votre souris, par conséquent toutes les variables globales
+///                  seront soceptibes d'être modifiées
+///                  TODO: BackUps
+///
+////////////////////////////////////////////////////////////////////////////////////////
+///  TAB:      Ralentir le temps
+///  ENTER:    
+///  UP:       Permet de sauter, une fois en l'air, on ne peut pas sauter encore
+///            TODO: Creer une fonction de double saut
+///
+////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////////////
+/// On considere que l'utilisateur ne peut pas sauter de manière instantanée, mais
+///  uniquement après ce nombre de mètres
+final int tempsDeReaction = 3;
+
 ////////////////////////////////////////////////////////////////////////////////////////
 //
 // les variables associées aux ressources
@@ -22,6 +78,16 @@ PImage solImg, dinoImgs[], cactusImgs[];
 ///  JUMP_SOUND, DEATH_SOUND, CENT_SOUND, ... TODO: add more
 // SOUND ERROR: SoundFile sounds[]; 
 
+/// TODO: Pilote automatique
+// TODO: Antigravity
+
+// TODO: AutoSlowDown
+
+// TODO: La trajectoir peut avoir quelques erreurs dans kle cas scale.x < 0
+// TODO: scale.x < 0
+// TODO: scale.y > 0
+
+// TODO: Afficher les trais limites dans les trajectoires apparentes
 
 // la police de caractères
 PFont myFont;
