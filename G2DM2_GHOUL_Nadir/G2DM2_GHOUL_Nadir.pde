@@ -583,6 +583,7 @@ boolean collision(final PVector p) {
   }
 
 
+  /// TODO: Réimplémenter en ce servant de http://www.e-lc.org/docs/2007_01_17_00_46_52/
 
   ///  Pour calculer si une sphère (le presonnage) entre en collision avec une ellipse (le cactus),
   ///    je dois vérifier si (d1 + d2) < rE + 2*rC
@@ -622,6 +623,7 @@ boolean collision(final PVector p) {
     }
   }
 
+  /// ... et une seconde dans tous les cas
 
 
 
