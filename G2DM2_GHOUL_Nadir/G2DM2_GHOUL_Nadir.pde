@@ -57,6 +57,11 @@
 
 
 
+
+////////////////////////////////////////////////////////////////////////////////////////
+//
+// Les variables associées à l'utilisateur
+//
 ////////////////////////////////////////////////////////////////////////////////////////
 /// On considere que l'utilisateur ne peut pas sauter de manière instantanée, mais
 ///  uniquement après ce nombre de mètres
@@ -76,12 +81,11 @@ final int tempsDeReaction = 3;
 ///    constantes SIMPLE et TRIPLE pour eviter de me tromper
 PImage solImg, dinoImgs[], cactusImgs[];
 
-// les sons
+// Les sons
 /// De même, j'utilise un tableau pour faire référence aux sons, avec les constantes:
 ///  JUMP_SOUND, DEATH_SOUND, CENT_SOUND, ... TODO: add more
 // SOUND ERROR: SoundFile sounds[];
 
-/// TODO: Pilote automatique
 // TODO: Antigravity
 
 // TODO: AutoSlowDown
@@ -144,7 +148,6 @@ boolean gameOver;
 float dT = 0.05;
 
 /// Les variables de débogage
-boolean dSpeedFollowsMouse;
 boolean dSpeedSquared;// Y evolue en fonction de x
 boolean dGravityFollowsMouse;
 boolean dShowCommandBar;
@@ -155,6 +158,31 @@ boolean dImmortal;
 
 // Poursuite du curseur
 boolean dPoursuite;
+
+/// Note: j'aurai pu utiliser <<, mais j'ai préféré voir la diagonale de 1
+final long AFFICHAGE_SILENCIEUX =    0b00000000000000000000000000000000;
+final long AFFICHAGE_BASE =          0b00000000000000000000000000000001;
+final long AFFICHAGE_PREDICTION =    0b00000000000000000000000000000010;
+final long AFFICHAGE_TRAJECTOIRES =  0b00000000000000000000000000000100;
+final long DEBUG_SPEED_F_MOUSE =     0b00000000000000000000000000001000;
+///  Pas vraiment bien organisé, just mettre on / off si on veut voir à peu
+///    près pourquoi le dino va où il va
+final long AFFICHAGE_SUISMOI =       0b00000000000000000000000000010000;
+
+/// C'est la combinaison de plein de booléens, chacuns ayant un offset
+///  bien spécifique, et on peut y accéder comme suit:
+///  
+///  Pour le mettre a vrai, on fais:
+///    affichage |= MASK
+///  Pour le mettre a faux, on fais:
+///    affichage &= ~MASK
+///  Pour le vérifier, on fais:
+///    affichage = 0 != (MASK & affichage)
+///  Pour l'inverser, on fais:
+///    affichage = (0 != (MASK & affichage)) ? (affichage & ~MASK) : (affichage | MASK)
+///                 ^si il est actif           ^le désactive          ^sinon l'activer
+///  Cela fontionne pour affichage ou debug
+long booleans;
 
 boolean dJumping;
 boolean dSlowLanding;
@@ -300,9 +328,9 @@ void setup() {
 
   acceleration = new PVector(2, g0);
 
+  booleans = 0;
 
   /// Les variables de débogage
-  dSpeedFollowsMouse = false;
   dGravityFollowsMouse = false;
   //// TODO: Show
   dContinuousTrajectory = false;
@@ -819,7 +847,7 @@ void afficherHitBoxes(float[][] positions, int step) {
   float x, y, _x, _y;
   _x = positions[0][0];
   _y = positions[0][1];
-  for (int i = 1; i < positions.length; i += step) {
+  for (int i = 1; i < positions.length; i += 1) {
     /// Si nous trouvons un quelconque y négatif, c'est que nous avons atteint la limite
     ///  du tableau, dans ce cas, aucune positions ne s'est révélé dangereuse
     x = positions[i][0];
@@ -827,16 +855,20 @@ void afficherHitBoxes(float[][] positions, int step) {
     if (y < 0) {
       return;
     }
-    // positions[i] = {x, y}
-    //    if (dContinuousTrajectory) {
-    line((_x * echelle.x) + repere.x, (_y * echelle.y) + repere.y, 
-      (x * echelle.x) + repere.x, (y * echelle.y) + repere.y);
-    //  } else {
-    ellipse((x * echelle.x) + repere.x, 
-      (y * echelle.y) + repere.y, hitBoxRadius * 2, hitBoxRadius * 2);
-    //}
-    _x = x;
-    _y = y;
+    ///  Nous itérerons tout les éléments, à la recherche du fameux -1, 
+    ///    mais nous n'afficherons que le premier et les autres
+    if (i % step == 0) {
+      // positions[i] = {x, y}
+      //    if (dContinuousTrajectory) {
+      line((_x * echelle.x) + repere.x, (_y * echelle.y) + repere.y, 
+        (x * echelle.x) + repere.x, (y * echelle.y) + repere.y);
+      //  } else {
+      ellipse((x * echelle.x) + repere.x, 
+        (y * echelle.y) + repere.y, hitBoxRadius * 2, hitBoxRadius * 2);
+      //}
+      _x = x;
+      _y = y;
+    }
   }
 }
 void afficherHitBoxes(float[][] positions) {
@@ -1222,7 +1254,7 @@ void keyPressed() {
     } else {
       switch(key | 32) {/// TODO: Afficher ceci
       case 'm':
-        dSpeedFollowsMouse = !dSpeedFollowsMouse;
+        inverser(DEBUG_SPEED_F_MOUSE);
         break;
       case 'g':
         dGravityFollowsMouse = !dGravityFollowsMouse;
@@ -1247,6 +1279,37 @@ void keyPressed() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Fonctions internes de manipulation des booléens
+//  TODO: Faire plus que des changement de variables, par exemple mettre à jour
+//        certaines variables qui peuvent être affectés par des booleens, par exemple
+//        revenir à une accélération gravitationelle normale après la fin s'une poursuite
+//
+//  TODO: Ajouter des callbacks, pour désactiver des options, par exemple le pilote auto
+//
+//////////////////////////////////////////////////////////////////////////////////////////
+//  Renvoie le masque entré est actif
+//  Note: Si vous entrez MASK1 | MASK2, renvoie vrai si au moin un est actif
+//        0 -> 0
+boolean etat(long mask) {
+  return (booleans & mask) != 0;
+}
+void activer(long mask) {
+  booleans |= mask;
+}
+void desactiver(long mask) {
+  booleans &= ~mask;
+}
+// Inverse l'état d'un mask
+void inverser(long mask) {
+  if (etat(mask)) {
+    desactiver(mask);
+  } else { 
+    activer(mask);
+  }
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////
 //
 // - Change l'acceleration gravitationelle pour pouvoir avoir un saut de y mètres
 // - redémarre le jeu quand on appuie sur la barre d'espace
@@ -1291,7 +1354,7 @@ void debugTools() {
     return;
   }
 
-  if (dSpeedFollowsMouse) {
+  if (etat(DEBUG_SPEED_F_MOUSE)) {
     vitesse.x = mouseX;
   } else if (dGravityFollowsMouse) {
     jumpSpeed = 100 * vitesseSaut0 / mouseX;
@@ -1472,6 +1535,7 @@ void poursuite() {
     ///    compenser l'absence d'une formule exacte, et comme les tests
     ///    devrons se faire en fin de boucle, le do..while est privilégié
     int _l = 0;
+    final int nombreMaxIterations = 50;
     do {
       /// A chaque itération, on recalcule la trajectoire
       predictions = prochainesPositions();
@@ -1480,21 +1544,29 @@ void poursuite() {
       diff = difference(predictions, target);
       under = diff > 0;      
 
-      text((under ? "DOWN" : "UP") + (erreurMaximaleAutorisee > abs(diff) ? " " : " non ") + "Négligeable" + abs(diff), width / 2, height / 2);
-
-      boolean depasse = trajectoireExageree(predictions, target);
+      boolean depasse = trajectoireExageree(predictions, target, etat(AFFICHAGE_SUISMOI), 5);
 
       if (!depasse) {
         acceleration.y += (under ? -1 : 1) * log(abs(diff) + 1);
       } else {
-
+        float _diff = difference(predictions, target);
+        float _a = acceleration.y;
         ///  Vu que nous ne modifions que l'accélération, il se peut qu'il soit
         ///    imporrible de viser le curseur sans dépasser de l'écran
         ///    dans ce cas, on s'assure au moins d'avoir essayé 
-        for (int k = 0; k < 50 && depasse; ++k) {
+        for (int k = 0; k < 5 && depasse; ++k) {
+          diff = difference(predictions, target);
           acceleration.y += 1;
           predictions = prochainesPositions();
-          depasse = trajectoireExageree(predictions, target);
+          depasse = trajectoireExageree(predictions, target, etat(AFFICHAGE_SUISMOI), 5);
+          if (abs(difference(predictions, target)) > abs(_diff)) {
+            if (etat(AFFICHAGE_SUISMOI)) {
+              text(difference(predictions, target), width / 2, height / 2);
+            }
+            /// Cela ne vaut pas le cout
+            acceleration.y = _a;
+            k = 51;
+          }
         }
       }
 
@@ -1504,11 +1576,13 @@ void poursuite() {
       /// V(t+1) = V(t) + v - g
       ///-V(t+1) + V(t) + v = g
       /// a = V0 + dT - Vn+1
-    } while (_l++ < 50 && (erreurMaximaleAutorisee > abs(diff)));
-    acceleration.y = (accelerationSum / 500);
-    fill(#ff0000);
-    afficherHitBoxes(prochainesPositions());
-    fill(64);
+    } while (_l++ < nombreMaxIterations && (erreurMaximaleAutorisee > abs(diff)));
+    acceleration.y = (accelerationSum / _l);
+    if (etat(AFFICHAGE_SUISMOI)) {
+      fill(#ff0000);
+      afficherHitBoxes(prochainesPositions());
+      fill(64);
+    }
   }
 }
 
@@ -1519,7 +1593,10 @@ void poursuite() {
 //                m'assurer que les valeurs ne seront pas mosifiées
 //
 ////////////////////////////////////////////////////////////////////////////////////////
-boolean trajectoireExageree(final float[][]trajectoire, final PVector target) {
+int nombreDappels = 0;
+boolean trajectoireExageree(final float[][]trajectoire, final PVector target, 
+  final boolean afficher, final int pas) {
+  text(nombreDappels++, 2 * width / 3, 0);
   ///  Petit bout de rustine démonstrant par sa seul présence la
   ///    fragilité de la solution, en effet, nous ne faisons que
   ///    modifier g (acceleration.y), et par conséquent nous ne
@@ -1543,6 +1620,7 @@ boolean trajectoireExageree(final float[][]trajectoire, final PVector target) {
   ///    cas, le sol fera son travail
   boolean depasse = false;
   boolean under = difference(trajectoire, target) > 0;
+  boolean dinoUnder = position.y < target.y;
 
   /// cela permet de voir les bonnes/mavaises
   fill(color(random(255), random(255), random(255)));
@@ -1565,10 +1643,10 @@ boolean trajectoireExageree(final float[][]trajectoire, final PVector target) {
 
       if (!dansTriangle) {
         depasse = true;
-      } else {
+      } else if (afficher) {
         /// Nous allons afficher beaucoups de hitBoxes
-        ///  donc on les éspace de 19 (1 sur 20 vont être affichées)
-        afficherHitBoxes(prochainesPositions(), 20);
+        ///  donc on les éspace de pas-1 (1 sur pas vont être affichées)
+        afficherHitBoxes(prochainesPositions(), pas);
       }
     }
   }
