@@ -42,6 +42,9 @@
 ///                  seront soceptibes d'être modifiées
 ///                  TODO: BackUps
 ///
+///  RESET:          Réinitialise la partie (appelle initJeu())
+///  RESTART:        Réinitialise le jeu (appelle setup())
+///
 ////////////////////////////////////////////////////////////////////////////////////////
 ///  TAB:      Ralentir le temps
 ///  ENTER:
@@ -1200,6 +1203,10 @@ void keyPressed() {
         dHelp = !dHelp;
       } else if (command.equals("viensamoi")) {
         dPoursuite = !dPoursuite;
+      } else if (command.equals("reset")) {
+        initJeu();
+      }else if (command.equals("restart")) {
+        setup();
       }
     }
   } else if (key == '²') {
@@ -1354,6 +1361,9 @@ void debugTools() {
   y += TEXT_SIZE / 3;
 
   text("Aide                          " + (dHelp ? "ON" : "OFF"), x, y);
+  y += TEXT_SIZE / 3;
+  
+  text("Poursuite                     " + (dPoursuite ? "ON" : "OFF"), x, y);
   y += TEXT_SIZE / 3;
 
   text("Ralentissement actuel         " + dSlowDownRate, x, y);
