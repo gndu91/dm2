@@ -1429,6 +1429,10 @@ void poursuite() {
       (mouseY - repere.y) / echelle.y
       );
 
+    /// Précision de la trajectoire, elle permet d'accélérer considérablement
+    ///  l'execution du code, 1/echelle.y => 1 px
+    float erreurMaximaleAutorisee = (10 / echelle.y);
+
     /// Prédire les prochaines positions si l'on fait rien
     float[][] predictions = prochainesPositions();
 
@@ -1444,105 +1448,54 @@ void poursuite() {
     ///    approximativement correcte)
     float accelerationSum = 0;
 
-    ///  Cette variable est utile pour savoir s'il faut monter ou
+    ///  La moyenne sera toujours recalculée, pour pouvoir arrêter la boucle
+    ///    dans le cas où l'erreur est trop faible
+    float accelerationMean= 0;
+
+    ///  Nous allons sauvegarder cette vatiable pour pouvoir
+    ///    réajuster le pas, et ainsi demander moins d'itérations pour
+    ///    le même résultat
+    float diff = difference(predictions, target);
+
+
+    ///  De plus, cette variable est utile pour savoir s'il faut monter ou
     ///    descendre, en effet s'il faut monter, je vais volontirement
     ///    restreindre l'accélération verticale pour qu'elle soit
     ///    positive, même si c'est pour aller trop haut (c'est le
     ///    but d'avoir un petit effet de vague dans le déplacement
     ///    vertical du dinosaure)
-    boolean under = difference(predictions, target) * 1.5 > 0;
-
-    ///  De plus, nous allons sauvegarder cette vatiable pour pouvoir
-    ///    réajuster le pas, et ainsi demander moins d'itérations pour
-    ///    le même résultat
-    float diff = difference(predictions, target);
+    boolean under = diff > 0;
 
     boolean dinoUnder = position.y < target.y;
 
     ///  Comme dit plus haut, le nombre d'itérations est important pour
-    ///    compenser l'absence d'une formule exacte
-    for (int l = 0; l < 20; ++l) {
-
+    ///    compenser l'absence d'une formule exacte, et comme les tests
+    ///    devrons se faire en fin de boucle, le do..while est privilégié
+    int _l = 0;
+    do {
+      /// A chaque itération, on recalcule la trajectoire
       predictions = prochainesPositions();
-      under = difference(predictions, target) > 0;
-      // On établis un intervalle sur x, par rapport au x de la souris
 
-      text(under ? "DOWN" : "UP", width / 2, height / 2);
+      /// Les variables de bases
+      diff = difference(predictions, target);
+      under = diff > 0;      
 
-      ///  Petit bout de rustine démonstrant par sa seul présence la
-      ///    fragilité de la solution, en effet, nous ne faisons que
-      ///    modifier g (acceleration.y), et par conséquent nous ne
-      ///    pouvons donc pas executer cette fonction si la souris
-      ///    est trop proche du dinosaure, ce qui aurait pour effet
-      ///    de chander la gravité pour des valeurs démesurées, voire
-      ///    INF.
-      ///  Ce booléen servira à savoir si nous dépassons de l'écran, pour
-      ///    savoir cela, nous allons calculer la différence entre le
-      ///    point maximal autorisé et le plus haut point de la trajectoire,
-      ///    en effet nous fairons un sorte de triangle ayant pour hypoténuse
-      ///    le segment PdinoPcurseur, et nous utiliserons le théorème de
-      ///    thalès pour s'assurer que tout les points de la trajectoire seront
-      ///    sous la droite correspondant à l'hypoténuse précedemment définie.
-      ///    x/y = X/Y => x = X*y/Y => y = x*Y/X
-      ///    Nous devons denc nous assurer que y soit plus petit que ça
-      ///  De plus, on ne va pas chercher à savoir ce qui adviendra après avoir
-      ///    dépassé le curseur
-      boolean depasse = false;
-      stroke(color(random(255), random(255), random(255)));
-      for (float[]i : predictions) {
-        if (i[0] < target.x) {
-          /// Différence des x pour la cible (Target) et pour la prediction (P)
-          float dxP = i[0] - position.x;
-          float dxT = target.x - position.x;
+      text((under ? "DOWN" : "UP") + (erreurMaximaleAutorisee > abs(diff) ? " " : " non ") + "Négligeable" + abs(diff), width / 2, height / 2);
 
-          float dyP = i[1] - position.y;
-          float dyT = target.y - position.y;
+      boolean depasse = trajectoireExageree(predictions, target);
 
-          /// Nous allons dans un premier temps calculer cela
-          boolean auDessusHyp = dyP > ((dxP * dyT) / dxT);
-
-          /// Pour en déduire cela
-          boolean dansTriangle = !under ? auDessusHyp : !auDessusHyp;
-
-          if (!dansTriangle) {
-            depasse = true;
-          } else {
-            afficherHitBoxes(prochainesPositions(), 20);
-          }
-        }
-      }
-      stroke(0);
-      ///  Vu que nous ne modifions que l'accélération, il se peut qu'il soit
-      ///    imporrible de viser le curseur sans dépasser de l'écran
-      ///    dans ce cas, on s'assure au moins d'avoir essayé 
-      for (int k = 0; k < 50 && depasse; ++k) {
-        acceleration.y += 1;
-        depasse = false;
-        stroke(color(random(255), random(255), random(255)));
-        for (float[]i : predictions) {
-          if (i[0] < target.x) {
-            /// Différence des x pour la cible (Target) et pour la prediction (P)
-            float dxP = i[0] - position.x;
-            float dxT = target.x - position.x;
-
-            float dyP = i[1] - position.y;
-            float dyT = target.y - position.y;
-
-            /// Nous allons dans un premier temps calculer cela
-            boolean auDessusHyp = dyP > ((dxP * dyT) / dxT);
-
-            /// Pour en déduire cela
-            boolean dansTriangle = !under ? auDessusHyp : !auDessusHyp;
-
-
-            if (!dansTriangle) {
-              depasse = true;
-            }
-          }
-        }
-      }
       if (!depasse) {
         acceleration.y += (under ? -1 : 1) * log(abs(diff) + 1);
+      } else {
+
+        ///  Vu que nous ne modifions que l'accélération, il se peut qu'il soit
+        ///    imporrible de viser le curseur sans dépasser de l'écran
+        ///    dans ce cas, on s'assure au moins d'avoir essayé 
+        for (int k = 0; k < 50 && depasse; ++k) {
+          acceleration.y += 1;
+          predictions = prochainesPositions();
+          depasse = trajectoireExageree(predictions, target);
+        }
       }
 
       accelerationSum += acceleration.y;
@@ -1551,7 +1504,7 @@ void poursuite() {
       /// V(t+1) = V(t) + v - g
       ///-V(t+1) + V(t) + v = g
       /// a = V0 + dT - Vn+1
-    }
+    } while (_l++ < 50 && (erreurMaximaleAutorisee > abs(diff)));
     acceleration.y = (accelerationSum / 500);
     fill(#ff0000);
     afficherHitBoxes(prochainesPositions());
@@ -1559,6 +1512,71 @@ void poursuite() {
   }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Fonction "interne", elle permet de savoir si notre trajectoire est exagerée.
+//    Précision:  les "final" dans la déclarations sont juste des garde-fous pour
+//                m'assurer que les valeurs ne seront pas mosifiées
+//
+////////////////////////////////////////////////////////////////////////////////////////
+boolean trajectoireExageree(final float[][]trajectoire, final PVector target) {
+  ///  Petit bout de rustine démonstrant par sa seul présence la
+  ///    fragilité de la solution, en effet, nous ne faisons que
+  ///    modifier g (acceleration.y), et par conséquent nous ne
+  ///    pouvons donc pas executer cette fonction si la souris
+  ///    est trop proche du dinosaure, ce qui aurait pour effet
+  ///    de chander la gravité pour des valeurs démesurées, voire
+  ///    INF.
+  ///  Ce booléen servira à savoir si nous dépassons de l'écran, pour
+  ///    savoir cela, nous allons calculer la différence entre le
+  ///    point maximal autorisé et le plus haut point de la trajectoire,
+  ///    en effet nous fairons un sorte de triangle ayant pour hypoténuse
+  ///    le segment PdinoPcurseur, et nous utiliserons le théorème de
+  ///    thalès pour s'assurer que tout les points de la trajectoire seront
+  ///    sous la droite correspondant à l'hypoténuse précedemment définie.
+  ///    x/y = X/Y => x = X*y/Y => y = x*Y/X
+  ///    Nous devons denc nous assurer que y soit plus petit que ça
+  ///  De plus, on ne va pas chercher à savoir ce qui adviendra après avoir
+  ///    dépassé le curseur
+  ///  Pour finir, je me permet de préciser qu'une trajectoire ne pourra
+  ///    d'après mois être que dans un sens, car dans l'autre, dans tout les
+  ///    cas, le sol fera son travail
+  boolean depasse = false;
+  boolean under = difference(trajectoire, target) > 0;
+
+  /// cela permet de voir les bonnes/mavaises
+  fill(color(random(255), random(255), random(255)));
+
+
+  for (float[]i : trajectoire) {
+    if (i[0] < target.x) {
+      /// Différence des x pour la cible (Target) et pour la prediction (P)
+      float dxP = i[0] - position.x;
+      float dxT = target.x - position.x;
+
+      float dyP = i[1] - position.y;
+      float dyT = target.y - position.y;
+
+      /// Nous allons dans un premier temps calculer cela
+      boolean auDessusHyp = dyP > ((dxP * dyT) / dxT);
+
+      /// Pour en déduire cela
+      boolean dansTriangle = !under ? auDessusHyp : !auDessusHyp;
+
+      if (!dansTriangle) {
+        depasse = true;
+      } else {
+        /// Nous allons afficher beaucoups de hitBoxes
+        ///  donc on les éspace de 19 (1 sur 20 vont être affichées)
+        afficherHitBoxes(prochainesPositions(), 20);
+      }
+    }
+  }
+
+  fill(64);
+
+  return depasse;
+}
 ////////////////////////////////////////////////////////////////////////////////////////
 //
 //  Fonction de saut, elle permet de sauter.
